@@ -1,4 +1,3 @@
-// gcc -Wall mpsketch3.c paths.c -L/usr/X11R6/lib -lX11 -L . -l mplib -l kpathsea -l mputil -lcairo -lpixman -lpng -lz -lmpfr -lgmp -lm -o mpsketch
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>		/* BitmapOpenFailed, etc. */
 #include <time.h>
@@ -29,15 +28,14 @@
 TODO: 
 don't draw_bezier for straight sections
 move a vee
-end_path should work for circles too. same with draw_path
-y and p (yank and push) rather than Enter and i
+draw_path should work for circles too
 fix offset adjustment on expose
-create mp file if it doesn't exist.
-make points visible against black.
+create mp file if it doesn't exist
+make points visible against black
 arrow keys to scroll
 port to gtk+
 centre diagram on screen. also when zooming, zoom into centre
-make fig_num int?
+make fig_num int? then how to handle zero-padding?
 remember past paths. key to clear paths. read in all paths in metapost file
 create program that takes in path string, outputs control points, so a gui could be made in a scripting language that calls it
 consider generating ps internally rather than calling mpost. see section 2.2 of mplibapi.pdf
@@ -55,11 +53,11 @@ pass in filename (to support non-default outputtemplate)
 mpsketch -f filename -s scale -p precision job_name fignum
 
 path editing: add points, remove point
-i to add point before, a for after. how to do "point t of p" in mplib?
+i to add point before, a for after. use bezier to find midpoint
 
 integration with vim: named pipe? 
 can read in lines from pipe into vim using :r !cat pipe
-vim can tell mpsketch to read path in by calling program that triggers XClientMessage, simulates keypress (i to read path from clipboard, r to redraw)
+vim can tell mpsketch to read path in by calling program that triggers XClientMessage, simulates keypress (p to read path from clipboard, r to redraw)
 */
 
 Display *d;
@@ -162,35 +160,6 @@ void box_msg(char *msg) {
 void error() {
 	box_msg("Error. See stdout for details.");
 }
-
-/*void mp_dump_solved_path (MP mp, mp_knot h) { //from https://www.tug.org/metapost/src/manual/mplibapi.pdf, modified to draw the path
-	mp_knot p, q;
-	if (h == NULL) return;
-	p = h;
-	do {
-		draw_circle(
-			mp_number_as_double(mp,p->x_coord),
-			mp_number_as_double(mp,p->y_coord),
-			POINT_RADIUS
-		);
-		q=mp_knot_next(mp,p);
-		if ( q!=h || h->data.types.left_type!=mp_endpoint) {
-			 draw_bezier(
-					  mp_number_as_double(mp,p->x_coord),
-					  mp_number_as_double(mp,p->y_coord),
-					  mp_number_as_double(mp,p->right_x),
-					  mp_number_as_double(mp,p->right_y),
-					  mp_number_as_double(mp,q->left_x),
-					  mp_number_as_double(mp,q->left_y),
-					  mp_number_as_double(mp,q->x_coord),
-					  mp_number_as_double(mp,q->y_coord)
-			 );
-		}
-		p=q;
-		if ( p!=h || h->data.types.left_type!=mp_endpoint) {
-		}
-	} while (p!=h);
-}*/
 
 //Find X(t) or Y(t) given coords of two points on curve and control points between them
 double bezier (double start, double start_right, double end_left, double end, double t) {

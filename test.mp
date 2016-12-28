@@ -49,36 +49,37 @@ beginfig(1)
 	path p;path q;
 
 	%shell
-	p := (22,-16)..(33,138)..(-91,65)..(-18,81)..(-37,101)..(-52,85)..(-35,71)..(-39,81)..(-40,78)..(-37,76); %spiral part
-	path cut; cut=(-45,50)--(-40,44); %where on the spiral it joins up
+	p := (22,-16)..(39,144)..(-91,65)..(-9,78)..(-37,101)..(-52,85)..(-35,71)..(-39,81)..(-40,78)..(-37,76); %spiral part
+	path cut; cut=(-40,31)..(-39,47); %where on the spiral it joins up
 	z0=(-20,10); 
 	fill (p intersectionpoint cut)..z0..(point 0 of p)--(p cutafter cut)--cycle withcolor 0.9*white;
 	draw (p intersectionpoint cut)..z0..(point 0 of p)--p;
 
-	label(btex $\int_0^1 x^2 dx$ etex,(-53,-138));
-	p := (-113,-212)..(-58,-212)..(4,-153)..(-18,-106)..(-81,-118)..(-82,-152)..(-48,-166)..(-26,-138)..(-46,-128); draw p;
-	cut := (-18,-185)..(-11,-191);
-	cut := (-26,-109)..(-22,-99);
+	label.rt("shell",(122,148));
+	drawarrow (122,148)..(84,148)..(49,130);
+
+
+	label(btex $\int_0^1 x^2 dx$ etex,(-3,-138));
+	p := (-63,-212)..(-8,-212)..(54,-153)..(32,-106)..(-31,-118)..(-32,-152)..(2,-166)..(24,-138)..(4,-128); draw p;
+	cut := (32,-185)..(39,-191);
+	cut := (24,-109)..(28,-99);
 	draw thelabel.top("spiral",(0,0)) rotated angle (direction (xpart (p intersectiontimes cut)) of p) shifted (p intersectionpoint cut);
+
 
 	dotlabel.bot("dot",(-217,110));
 	label("label",(-298,42));
 	drawarrow (-290,48)..(-262,85)..(-227,102);
-	label.rt("shell",(122,148));
-	drawarrow (122,148)..(84,148)..(49,130);
 
-	picture thingo; thingo = image(
-	p := (-327,-46)..(-261,-37)..(-212,-76)..(-171,-154)..(-110,-189)..(-64,-122)..(-93,-5)..(-155,-11)..(-153,-96)..(-119,-112)..(-104,-46)..(-139,-53)..(-127,-81)..(-117,-65)..(-124,-65)..(-123,-69); draw p;
-	draw fullcircle scaled 51 shifted (-224,-26);
-	draw fullcircle scaled 29 shifted (-307,-20);
-	draw fullcircle scaled 17 shifted (-166,-143);
-	draw fullcircle scaled 23 shifted (-75,-119);
-	draw fullcircle scaled 10 shifted (-137,-42);
-	draw fullcircle scaled 12 shifted (-147,-87);
-	dotlabel.urt("point", ((-86,-17)..(-77,-8)) intersectionpoint p);
-	draw tangent(p,(-86,-17)..(-77,-8))..(-150,40)..(-165,95)..(-134,116)..(-116,104)..(-124,94)..(-135,97)..(-130,104););
 
-	draw thingo shifted ((-94,-115) - (-62,-121));
+	p := (-359,-40)..(-293,-31)..(-244,-70)..(-203,-148)..(-142,-183)..(-96,-148)..(-125,1)..(-187,-5)..(-185,-90)..(-151,-106)..(-136,-40)..(-171,-47)..(-159,-75)..(-149,-59)..(-156,-59)..(-155,-63); draw p;
+	draw fullcircle scaled 51 shifted (-256,-20);
+	draw fullcircle scaled 29 shifted (-339,-14);
+	draw fullcircle scaled 17 shifted (-198,-137);
+	draw fullcircle scaled 23 shifted (-107,-113);
+	draw fullcircle scaled 10 shifted (-169,-36);
+	draw fullcircle scaled 12 shifted (-179,-81);
+	dotlabel.urt("point", ((-118,-11)..(-109,-2)) intersectionpoint p);
+	draw tangent(p,(-118,-11)..(-109,-2))..(-182,46)..(-197,101)..(-169,128)..(-148,110)..(-156,100)..(-167,103)..(-162,110);
 
 	drawarrow (-320,-14)..(-309,-13)..(-298,-14);
 	drawarrow (-234,-44)..(-222,-57)..(-214,-78);

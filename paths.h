@@ -1,12 +1,12 @@
+#ifndef MPSKETCH_PATHS_INCLUDED
+#define MPSKETCH_PATHS_INCLUDED
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include "../mplib/mplib.h" //needed to get control points for bezier curve
-
-#ifndef MPSKETCH_PATHS_INCLUDED
-#define MPSKETCH_PATHS_INCLUDED
 
 #define PRECISION 0 //number of decimal points to print for drawing coordinates
 #define INITIAL_POINTS 10 //how many points to allocate space for initially

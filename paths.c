@@ -39,6 +39,7 @@ void get_path(char *s) {
 	}
 }
 
+//find the bezier control points for all the points on the path
 void get_controls(struct path *p) {
 	MP mp;
 	mp_knot first_knot, last_knot;
@@ -85,26 +86,28 @@ void get_controls(struct path *p) {
 	free(opt);
 }
 
-void set_point(int i, double x, double y, bool is_straight) {
-	set_coords(i,x,y);
-	set_straight(i,is_straight);
-}
-void set_last_point(double x, double y, bool is_straight) {
-	set_point(cur_path->n-1,x,y,is_straight);
-}
-
+//commands for setting properties of a point
 void set_straight(int i,bool is_straight) {
 	cur_path->points[i].straight = is_straight;
-}
-void set_last_straight(bool is_straight) {
-	set_straight(cur_path->n-1,is_straight);
 }
 void set_coords(int i,double x,double y) {
 	cur_path->points[i].x = x;
 	cur_path->points[i].y = y;
 }
+void set_point(int i, double x, double y, bool is_straight) {
+	set_coords(i,x,y);
+	set_straight(i,is_straight);
+}
+
+//set properties of the last point in the path
+void set_last_straight(bool is_straight) {
+	set_straight(cur_path->n-1,is_straight);
+}
 void set_last_coords(double x,double y) {
 	set_coords(cur_path->n-1,x,y);
+}
+void set_last_point(double x, double y, bool is_straight) {
+	set_point(cur_path->n-1,x,y,is_straight);
 }
 
 void append_point(double x, double y, bool is_straight) {
@@ -117,6 +120,7 @@ void append_point(double x, double y, bool is_straight) {
 	set_last_point(x,y,is_straight);
 }
 
+//return the metapost string describing the path, eg (0,0)..(5,23)..(16,-27)
 char *path_string() {
 	size_t size = 1000; //initial size of string. enough to hold "fullcircle ..."
 	char *s = malloc(size * sizeof *s);
