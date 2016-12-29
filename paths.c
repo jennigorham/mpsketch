@@ -8,7 +8,7 @@ void init_path(struct path *p) {
 }
 
 //get a path from a string. Experimental, currently does no checking
-void get_path(char *s) {
+void string_to_path(char *s) {
 	int i=1;
 	int j=i;
 	double x,y;
@@ -121,7 +121,7 @@ void append_point(double x, double y, bool is_straight) {
 }
 
 //return the metapost string describing the path, eg (0,0)..(5,23)..(16,-27)
-char *path_string() {
+char *path_to_string() {
 	size_t size = 1000; //initial size of string. enough to hold "fullcircle ..."
 	char *s = malloc(size * sizeof *s);
 	strcpy(s,"");

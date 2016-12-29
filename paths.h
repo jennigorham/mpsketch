@@ -26,9 +26,10 @@ struct path *cur_path;
 
 void init_path(struct path *p);
 
-void get_path(char *buffer); //get path from string
+void string_to_path(char *buffer); //get path from string
+char *path_to_string(); //return the string defining the path
+
 void get_controls(); //find metapost's bezier control points for the path
-char *path_string(); //return the string defining the path
 
 //edit a point
 void set_straight(int i,bool is_straight);
