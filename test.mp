@@ -56,7 +56,7 @@ beginfig(1)
 	draw (p intersectionpoint cut)..z0..(point 0 of p)--p;
 
 	label.rt("shell",(122,148));
-	drawarrow (122,148)..(84,148)..(49,130);
+	drawarrow (122,148)..(84,148)..(59,136);
 
 
 	label(btex $\int_0^1 x^2 dx$ etex,(-3,-138));

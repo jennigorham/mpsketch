@@ -26,13 +26,13 @@
 
 /*
 TODO: 
-don't draw_bezier for straight sections
 include instructions on how to get mplib in README
 move a vee
 draw_path should work for circles too
 create mp file if it doesn't exist
 make points visible against black
 arrow keys to scroll
+shift or scale path
 port to gtk+
 centre diagram on screen. also when zooming, zoom into centre
 make fig_num int? then how to handle zero-padding?
@@ -105,6 +105,7 @@ void show_msg(int pos,char *msg); //display message
 
 void redraw_screen(); //draw bitmap on screen, then draw the path
 void draw_path();
+void link_point_pair(struct point *p, struct point *q); //draw either a straight line or a bezier curve linking two consecutive points on a path
 double bezier(double start, double start_right, double end_left, double end, double t);
 void draw_bezier(double start_x, double start_y, double start_right_x, double start_right_y, double end_left_x, double end_left_y, double end_x, double end_y); //draw the cubic bezier curve connecting two points
 void output_path();//print the path and copy to clipboard
@@ -649,15 +650,15 @@ void refresh() {
 	run_mpost();
 }
 
-void draw_path() {
-	get_controls();
-	
-	int i;
-	struct point *p,*q;
-	for (i=0; i<cur_path->n-1; i++) {
-		p = &cur_path->points[i];
-		q = &cur_path->points[i+1];
-		draw_circle(cur_path->points[i].x,cur_path->points[i].y, POINT_RADIUS);
+void link_point_pair(struct point *p, struct point *q) {
+	if (p->straight) {
+		XDrawLine(d, w, gc, 
+			mp_x_coord_to_pxl(p->x),
+			mp_y_coord_to_pxl(p->y),
+			mp_x_coord_to_pxl(q->x),
+			mp_y_coord_to_pxl(q->y)
+		);
+	} else {
 		draw_bezier(
 			p->x,
 			p->y,
@@ -669,20 +670,23 @@ void draw_path() {
 			q->y
 		);
 	}
-	draw_circle(cur_path->points[cur_path->n-1].x,cur_path->points[cur_path->n-1].y, POINT_RADIUS);
+}
+void draw_path() {
+	get_controls();
+	
+	int i;
+	struct point *p,*q;
+	for (i=0; i<cur_path->n-1; i++) {
+		p = &cur_path->points[i];
+		q = &cur_path->points[i+1];
+		draw_circle(p->x,p->y, POINT_RADIUS);
+		link_point_pair(p,q);
+	}
+	p = &cur_path->points[cur_path->n-1];
+	draw_circle(p->x,p->y, POINT_RADIUS);
 	if (cur_path->cycle) {
-		p = &cur_path->points[cur_path->n-1];
 		q = &cur_path->points[0];
-		draw_bezier(
-			p->x,
-			p->y,
-			p->right_x,
-			p->right_y,
-			q->left_x,
-			q->left_y,
-			q->x,
-			q->y
-		);
+		link_point_pair(p,q);
 	}
 }
 
