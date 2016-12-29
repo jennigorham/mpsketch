@@ -27,9 +27,9 @@
 /*
 TODO: 
 don't draw_bezier for straight sections
+include instructions on how to get mplib in README
 move a vee
 draw_path should work for circles too
-fix offset adjustment on expose
 create mp file if it doesn't exist
 make points visible against black
 arrow keys to scroll
@@ -42,8 +42,8 @@ consider generating ps internally rather than calling mpost. see section 2.2 of 
 config file to change keybindings
 
 split into multiple files:
-	gui-related parts: event handling, displaying error messages, drawing circles and lines, convert mp coords to pixels, clipboard, move_knot, trace
-	refresh/run mpost/get_coords/convert
+	gui-related parts: event handling, displaying error messages, drawing circles and lines, convert mp coords to pixels, clipboard, move_point, trace
+	mptoraster: refresh/run mpost/get_coords/convert
 
 getopt:
 tracing mode
@@ -93,12 +93,12 @@ float ll_y = 0;
 
 //when we mouse over a point in a completed path, we can edit it
 bool edit=false;
-int edit_point; //which knot are we editing
+int edit_point; //which point are we editing
 
 void button_release(short x,short y,int button); //do stuff when mouse button is pressed
 void keypress(int keycode,int state); //do stuff when a key is pressed
 void pointer_move(short x,short y);
-void move_knot(); //when you click and drag a point on a path/circle
+void move_point(); //when you click and drag a point on a path/circle
 
 void show_help(); //display message about usage
 void show_msg(int pos,char *msg); //display message
@@ -395,7 +395,7 @@ int main(int argc, char **argv) {
 			if (help) show_help(); else redraw_screen();
 			break;
 		case ButtonPress:
-			if (edit) move_knot();
+			if (edit) move_point();
 			break;
 		case ButtonRelease:
 			button_release(e.xbutton.x,e.xbutton.y,e.xbutton.button);
@@ -497,7 +497,7 @@ void keypress(int keycode,int state) {
 	case 32://r
 		refresh();
 		break;
-	case 41://u - undo creating a knot
+	case 41://u - undo creating a point
 		if (!finished_drawing && cur_path->n > 0) {
 			cur_path->n--;
 			if (cur_path->n == 0) finished_drawing = true;
@@ -547,7 +547,7 @@ void keypress(int keycode,int state) {
 	}
 }
 
-void move_knot() {
+void move_point() {
 	XEvent e;
 	XNextEvent(d, &e);
 	while (e.type != ButtonRelease) {
@@ -605,7 +605,7 @@ void button_release(short x, short y,int button) {
 				);
 			}
 			redraw_screen();
-			//knot under pointer
+			//point under cursor
 			append_point(
 				pxl_to_mp_x_coord(x),
 				pxl_to_mp_y_coord(y),
