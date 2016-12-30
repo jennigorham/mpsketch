@@ -43,7 +43,7 @@ int get_coords(char *job_name, char *fig_num, float *ll_x, float *ll_y) {
 	sprintf(log_filename,"%s.log",job_name);
 	log = fopen(log_filename,"r");
 	if (log == NULL) {
-		printf("\nERROR: couldn't open '%s.log'.\n",job_name);
+		fprintf(stderr,"ERROR: couldn't open '%s.log'.\n",job_name);
 		return 1;
 	} else {
 		char substring[26 + strlen(fig_num)];
@@ -71,7 +71,7 @@ int get_coords(char *job_name, char *fig_num, float *ll_x, float *ll_y) {
 		fclose(log);
 
 		if (!found_coords) {
-			printf("\nERROR: coordinates of lower left corner of diagram not found in '%s.log'.\n",job_name);
+			fprintf(stderr,"ERROR: coordinates of lower left corner of diagram not found in '%s.log'.\n",job_name);
 			puts("Ensure that the figure number is correct,");
 			printf("and that %s.mp contains the following lines at the start:\n\n",job_name);
 			puts("prologues:=3;");
@@ -115,10 +115,12 @@ int make_bitmap(char *job_name, char *fig_num, int density, char *filename) {
 	printf("\nRunning \"%s\"...\n\n",cmd);
 	int ret = system(cmd);
 	if (ret != 0) {
-		puts("ERROR: couldn't create bitmap. This could be due to one of the following:");
-		puts("You're using a non-default outputtemplate.");
-		puts("Imagemagick is not installed on your system.");
-		puts("You haven't set \"prologues:=3;\" in your metapost file.");
+		//printf("%d\n",ret);
+		fprintf(stderr,"ERROR: couldn't create bitmap.");
+		puts("This could be due to one of the following:");
+		puts("You're using a non-default outputtemplate."); //ret = 256
+		puts("Imagemagick is not installed on your system."); //ret = 32512
+		puts("You haven't set \"prologues:=3;\" in your metapost file."); //hangs, ret = 2
 	}
 	return ret;
 }

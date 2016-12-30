@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "../mplib/mplib.h" //needed to get control points for bezier curve
+#include "mplib/mplib.h" //needed to get control points for bezier curve
 
 #define PRECISION 0 //number of decimal points to print for drawing coordinates
 #define INITIAL_POINTS 10 //how many points to allocate space for initially
