@@ -27,7 +27,6 @@
 /*
 TODO: 
 include instructions on how to get mplib in README
-don't use rm
 move a vee
 draw_path should work for circles too
 create mp file if it doesn't exist
@@ -48,11 +47,9 @@ split into multiple files:
 	paths: struct path, get control points, string to path, path to string, append_point, etc
 
 getopt:
-tracing mode
 option for copy path only vs include "draw ...;"
-pass in scale, precision
 pass in filename (to support non-default outputtemplate)
-mpsketch -f filename -s scale -p precision job_name fignum
+mpsketch -f filename -u units -p precision job_name fignum
 
 path editing: add points, remove point
 i to add point before, a for after. use bezier to find midpoint
