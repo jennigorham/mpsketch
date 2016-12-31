@@ -1,4 +1,5 @@
 #include <X11/Xlib.h>
+#include <ctype.h>
 #include <time.h>
 #include <sys/stat.h>
 #include <stdio.h>
@@ -13,7 +14,7 @@
 
 #define _NET_WM_STATE_ADD 1
 #define SUBINTERVALS 20 //how many straight sections to make up the bezier curve connecting two points
-#define SCALE 72.0 //metapost units are 1/72 of an inch
+#define INCH 72.0 //an inch is 72 postscript points
 #define XBM_FILENAME "mp-drawing.xbm"
 #define POINT_RADIUS 3 //for drawing a little circle around each point on the path
 #define SCROLL_STEP 10 //How many pixels to scroll at a time
@@ -72,7 +73,7 @@ unsigned int bitmap_width, bitmap_height;
 Pixmap tracing_bitmap;
 int trace_x_offset,trace_y_offset;
 void get_trace();
-bool show_trace;
+bool show_trace = false;
 
 bool quit=false;
 bool help=true; //show help message
@@ -82,6 +83,7 @@ bool finished_drawing=true; //if true then we're ready to start drawing another 
 char *job_name; //The part of the metapost filename before ".mp"
 char *fig_num; //metapost figure number (the "1" in "beginfig(1)" for example). Should be string rather than int because sometimes figure numbers are zero-padded, depending on the output template
 
+double unit = 1; //default is to use units of metapost points (1/72 inches). 
 int density = 100; //points per inch for bitmap. changes when we zoom in
 int x_offset=0; //for scrolling
 int y_offset=0;
@@ -115,16 +117,16 @@ void refresh(); //rerun metapost if necessary, otherwise just rerun convert (if 
 
 //Converting between metapost coords and xlib coords
 int mp_x_coord_to_pxl(double x) {
-	return round((x - ll_x)/SCALE*density - x_offset);
+	return round((x*unit - ll_x)/INCH*density - x_offset);
 }
 int mp_y_coord_to_pxl(double y) {
-	return round(win_height - y_offset - (y - ll_y)/SCALE*density);
+	return round(win_height - y_offset - (y*unit - ll_y)/INCH*density);
 }
 double pxl_to_mp_x_coord(int x) {
-	return (x_offset + ((float) x))*SCALE/density + ll_x;
+	return ((x_offset + ((float) x))*INCH/density + ll_x)/unit;
 }
 double pxl_to_mp_y_coord(int y) {
-	return (-y_offset + win_height-((float) y))*SCALE/density + ll_y;
+	return ((-y_offset + win_height-((float) y))*INCH/density + ll_y)/unit;
 }
 
 void draw_circle(double centre_x, double centre_y, int r) {
@@ -188,10 +190,29 @@ void copy_to_clipboard(char* s) {
 }
 
 int main(int argc, char **argv) {
-	if (argc > 1) job_name = argv[1];
+	char *trace_filename;
+	int c;
+	while ((c = getopt (argc, argv, "u:t:")) != -1)
+		switch (c)
+		{
+			case 'u':
+				unit = strtod(optarg,NULL);
+				break;
+			case 't':
+				show_trace = true;
+				trace_filename = optarg;
+				break;
+			case '?':
+				return 1;
+			default:
+				abort ();
+		}
+	coord_precision = ceil(log10(unit)); //choose a sensible number of decimal places for coordinates
+
+	if (argc > optind) job_name = argv[optind];
 	else job_name = "test";
-	if (argc > 2) {
-		fig_num = argv[2];
+	if (argc > optind+1) {
+		fig_num = argv[optind+1];
 	} else fig_num = "1";
 	//TODO: create job_name.mp if it doesn't exist
 	
@@ -220,9 +241,9 @@ int main(int argc, char **argv) {
 	Atom wm_delete_window = XInternAtom(d, "WM_DELETE_WINDOW", False); 
 	XSetWMProtocols(d, w, &wm_delete_window, 1);
 
-	//load picture in to trace over
-	show_trace = true;
-	get_trace();
+	//load picture to trace over
+	if (show_trace)
+		get_trace(trace_filename);
 
 	refresh();
 
@@ -232,8 +253,8 @@ int main(int argc, char **argv) {
 		case Expose: //on startup, and when window is resized, workspace switched
 			;Window rt; int x,y; unsigned int bw,dpth;
 			XGetGeometry(d,w,&rt,&x,&y,&win_width,&win_height,&bw,&dpth);
-			//x_offset = -ll_x/SCALE*density - win_width/2;
-			//y_offset = ll_y/SCALE*density + win_height/2;
+			//x_offset = -ll_x/INCH*density - win_width/2;
+			//y_offset = ll_y/INCH*density + win_height/2;
 			redraw_screen();
 			break;
 		case ButtonPress:
@@ -581,7 +602,7 @@ void redraw_screen() {
 			double delta_x,delta_y, r;
 			delta_x = cur_path->points[0].x - cur_path->points[1].x;
 			delta_y = cur_path->points[0].y - cur_path->points[1].y;
-			r = sqrt(delta_x*delta_x + delta_y*delta_y) / SCALE * density;
+			r = sqrt(delta_x*delta_x + delta_y*delta_y) / INCH * density * unit;
 
 			draw_circle(cur_path->points[0].x,cur_path->points[0].y,(int) r);
 			draw_circle(cur_path->points[0].x,cur_path->points[0].y,POINT_RADIUS);
@@ -618,7 +639,7 @@ void pointer_move(short x,short y) {
 	}
 }
 
-void get_trace() {
+void get_trace(char *filename) {
 	unsigned int trace_width,trace_height;
-	if (get_bitmap("test.xbm",d,w,&tracing_bitmap,&trace_width,&trace_height) != 0) show_trace = false;
+	if (get_bitmap(filename,d,w,&tracing_bitmap,&trace_width,&trace_height) != 0) show_trace = false;
 }

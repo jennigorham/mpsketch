@@ -8,7 +8,6 @@
 #include <math.h>
 #include "mplib/mplib.h" //needed to get control points for bezier curve
 
-#define PRECISION 0 //number of decimal points to print for drawing coordinates
 #define INITIAL_POINTS 10 //how many points to allocate space for initially
 
 struct point {
@@ -23,6 +22,8 @@ struct path {
 };
 
 struct path *cur_path;
+
+unsigned int coord_precision; //number of decimal places for printing coordinates
 
 void init_path(struct path *p);
 

@@ -131,19 +131,19 @@ char *path_to_string() {
 		delta_y = cur_path->points[0].y - cur_path->points[1].y;
 		r = sqrt(delta_x*delta_x + delta_y*delta_y);
 		snprintf(s, size, "fullcircle scaled %.*f shifted (%.*f,%.*f)",
-			PRECISION, 2*r,
-			PRECISION, cur_path->points[0].x,
-			PRECISION, cur_path->points[0].y
+			coord_precision, 2*r,
+			coord_precision, cur_path->points[0].x,
+			coord_precision, cur_path->points[0].y
 		);
 	} else if (cur_path->n == 1) { //point
-		snprintf(s,size,"(%.*f,%.*f)",PRECISION,cur_path->points[0].x,PRECISION,cur_path->points[0].y);
+		snprintf(s,size,"(%.*f,%.*f)",coord_precision,cur_path->points[0].x,coord_precision,cur_path->points[0].y);
 	} else if (cur_path->n > 1) { //path
 		char point[30];
 		int i;
 		for (i=0;i<cur_path->n;i++) {
 			snprintf(point,sizeof(point),"(%.*f,%.*f)",
-				PRECISION, cur_path->points[i].x,
-				PRECISION, cur_path->points[i].y
+				coord_precision, cur_path->points[i].x,
+				coord_precision, cur_path->points[i].y
 			); //should i print a warning here if there isn't enough space to fit the string? but that will never happen and wouldn't be a big problem if it did
 
 			if (strlen(s) + sizeof(point) + 20 > size) { //maybe not enough space to fit, so grow s
