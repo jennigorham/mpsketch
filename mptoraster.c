@@ -6,7 +6,8 @@ int run_mpost(char *job_name) {
 	if (USE_MPTOPDF)
 		sprintf(cmd,"mptopdf %s.mp",job_name);
 	else
-		sprintf(cmd,"mpost --interaction=nonstopmode %s.mp",job_name);
+		sprintf(cmd,"mpost --halt-on-error %s.mp",job_name);
+		//sprintf(cmd,"mpost --interaction=nonstopmode %s.mp",job_name);
 	printf("\nRunning \"%s\"...\n",cmd);
 	return system(cmd);
 }
@@ -16,7 +17,7 @@ int get_coords(char *job_name, char *fig_num, float *ll_x, float *ll_y) {
 	//There are three ways I can think of doing this.
 	//Method 1: use "show ..." in the metapost to write the coords to stdout then read them in with popen
 	//Method 2: similar, but read them from the log file afterwards. (This doesn't work with mptopdf - it doesn't seem to write show commands to the log.)
-	//Method 3: use "write ..." in the metapost to write the coords to a separate file. The advantage of this is that the file will only contain those coords so we don't have to search through it like with the log file. But how to handle multiple figures? And it's a bit messy to be creating all these files; we delete it afterwards, but still.
+	//Method 3: use "write ..." in the metapost to write the coords to a separate file. The advantage of this is that the file will only contain those coords so we don't have to search through it like with the log file. We'd have to write a separate file for each fig_num, or write the fig_nums to the file as well
 
 	char buffer[100];
 	bool found_coords = false;
@@ -115,12 +116,21 @@ int make_bitmap(char *job_name, char *fig_num, int density, char *filename) {
 	printf("\nRunning \"%s\"...\n\n",cmd);
 	int ret = system(cmd);
 	if (ret != 0) {
-		//printf("%d\n",ret);
+		printf("%d\n",ret);
 		fprintf(stderr,"ERROR: couldn't create bitmap.");
-		puts("This could be due to one of the following:");
+		puts("Ensure that imagemagick is installed.");
+		//now that mpsketch-coords.mp overrides prologues and outputtemplate, we don't need the following:
+		/*puts("This could be due to one of the following:");
 		puts("You're using a non-default outputtemplate."); //ret = 256
 		puts("Imagemagick is not installed on your system."); //ret = 32512
-		puts("You haven't set \"prologues:=3;\" in your metapost file."); //hangs, ret = 2
+		puts("You haven't set \"prologues:=3;\" in your metapost file."); //ret = 256 if prologues=0, hangs if prologues=1 or 2*/
+		/*You can see more info on why it hangs when prologues is 1 or 2 by running "gs [psfile]". It says:
+		"Can't find (or can't open) font file /usr/share/ghostscript/9.10/Resource/Font/CMR10.
+		Can't find (or can't open) font file CMR10.
+		Querying operating system for font files..."
+		This seems to be a problem with ghostscript 9.10: https://bugs.ghostscript.com/show_bug.cgi?id=695787
+		Can be fixed by running system("GS_OPTIONS=-dNONATIVEFONTMAP convert ... but it doesn't matter now because I've put prologues:=3 in the save_coords macro in mpsketch-coords.mp so if the user sets prologues:=1 it'll be overridden
+		*/
 	}
 	return ret;
 }

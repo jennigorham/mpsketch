@@ -1,5 +1,6 @@
 input mpsketch-coords;
-%outputtemplate := "%j.%3c";
+outputtemplate := "%j.%3c";
+prologues:=2;
 
 u:=1cm;
 def tangent (expr curve,cut) = (point (xpart (curve intersectiontimes cut)) of curve){direction (xpart (curve intersectiontimes cut)) of curve} enddef;

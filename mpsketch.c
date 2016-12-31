@@ -26,6 +26,8 @@
 
 /*
 TODO: 
+port to gtk+
+path editing: add points, remove point
 include instructions on how to get mplib in README
 move a vee
 draw_path should work for circles too
@@ -33,13 +35,12 @@ create mp file if it doesn't exist
 make points visible against black
 arrow keys to scroll
 shift or scale path
-port to gtk+
 centre diagram on screen. also when zooming, zoom into centre
 make fig_num int? then how to handle zero-padding?
 remember past paths. key to clear paths. read in all paths in metapost file
 create program that takes in path string, outputs control points, so a gui could be made in a scripting language that calls it
 consider generating ps internally rather than calling mpost. see section 2.2 of mplibapi.pdf
-config file to change keybindings
+config file to change keybindings?
 
 split into multiple files:
 	gui-related parts: event handling, displaying error messages, drawing circles and lines, convert mp coords to pixels, clipboard, move_point, trace
@@ -50,9 +51,6 @@ getopt:
 option for copy path only vs include "draw ...;"
 pass in filename (to support non-default outputtemplate)
 mpsketch -f filename -u units -p precision job_name fignum
-
-path editing: add points, remove point
-i to add point before, a for after. use bezier to find midpoint
 
 integration with vim: named pipe? 
 can read in lines from pipe into vim using :r !cat pipe
