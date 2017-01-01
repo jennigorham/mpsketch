@@ -119,6 +119,14 @@ void append_point(double x, double y, bool is_straight) {
 	cur_path->n++;
 	set_last_point(x,y,is_straight);
 }
+void remove_point(int i) {
+	if (i >= 0 && i < cur_path->n) {
+		for (; i<cur_path->n-1; i++) {
+			set_point(i, cur_path->points[i+1].x, cur_path->points[i+1].y, cur_path->points[i+1].straight);
+		}
+		cur_path->n--;
+	}
+}
 
 //return the metapost string describing the path, eg (0,0)..(5,23)..(16,-27)
 char *path_to_string() {

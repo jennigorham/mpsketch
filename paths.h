@@ -42,5 +42,6 @@ void set_last_straight(bool is_straight);
 void set_last_point(double x, double y, bool is_straight);
 
 void append_point(double x, double y, bool is_straight);
+void remove_point(int i);
 
 #endif

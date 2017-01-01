@@ -27,6 +27,7 @@
 /*
 TODO: 
 port to gtk+
+could create a new mp file by concatenating the save_coords macro and the source mp file then delete it (and the ps and log files) afterwards. that way the user wouldn't need to "input mpsketch-coords;"
 path editing: add points, remove point
 include instructions on how to get mplib in README
 move a vee
@@ -304,7 +305,8 @@ void show_help() {
 	pos++;
 
 	show_msg(pos++,"After a path, circle, or point has been drawn, you can edit it by dragging the little circles.");
-	show_msg(pos++,"Once you're happy with it, press y (\"yank\" the path) to output the path to clipboard and stdout."); 
+	show_msg(pos++,"To delete a point, mouse over it, then press d.");
+	show_msg(pos++,"Once you're happy with the path, press y (\"yank\" the path) to output the path to clipboard and stdout."); 
 	show_msg(pos++,"You can copy a path from your mp file to the clipboard, then edit it by pressing p (\"push\" a path)."); 
 	pos++;
 
@@ -334,6 +336,13 @@ void keypress(int keycode,int state) {
 		if (!finished_drawing) {
 			cur_path->cycle = true;
 			end_path();
+		}
+		break;
+	case 43://d
+		if (edit) {
+			remove_point(edit_point);
+			edit=false;
+			redraw_screen();
 		}
 		break;
 	case 26://period
