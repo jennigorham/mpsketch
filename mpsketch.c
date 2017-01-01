@@ -306,6 +306,7 @@ void show_help() {
 
 	show_msg(pos++,"After a path, circle, or point has been drawn, you can edit it by dragging the little circles.");
 	show_msg(pos++,"To delete a point, mouse over it, then press d.");
+	show_msg(pos++,"Press a to insert a point after the selected point, or i to insert it before.");
 	show_msg(pos++,"Once you're happy with the path, press y (\"yank\" the path) to output the path to clipboard and stdout."); 
 	show_msg(pos++,"You can copy a path from your mp file to the clipboard, then edit it by pressing p (\"push\" a path)."); 
 	pos++;
@@ -338,10 +339,37 @@ void keypress(int keycode,int state) {
 			end_path();
 		}
 		break;
-	case 43://d
+	case 43://d - delete a point
 		if (edit) {
 			remove_point(edit_point);
 			edit=false;
+			redraw_screen();
+		}
+		break;
+	case 42://i - insert a point before current point
+		if (edit && edit_point > 0) {
+			get_controls();
+			struct point p = cur_path->points[edit_point-1];
+			struct point q = cur_path->points[edit_point];
+			insert_point(edit_point,
+				bezier(p.x,p.right_x,q.left_x,q.x,0.5),
+				bezier(p.y,p.right_y,q.left_y,q.y,0.5),
+				p.straight
+			);
+			edit_point++;
+			redraw_screen();
+		}
+		break;
+	case 38://a - insert a point after current point
+		if (edit && edit_point < cur_path->n-1) {
+			get_controls();
+			struct point p = cur_path->points[edit_point];
+			struct point q = cur_path->points[edit_point+1];
+			insert_point(edit_point+1,
+				bezier(p.x,p.right_x,q.left_x,q.x,0.5),
+				bezier(p.y,p.right_y,q.left_y,q.y,0.5),
+				p.straight
+			);
 			redraw_screen();
 		}
 		break;

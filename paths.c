@@ -127,6 +127,17 @@ void remove_point(int i) {
 		cur_path->n--;
 	}
 }
+void insert_point(int i, double x, double y, bool is_straight) {
+	if (i >= 0 && i <= cur_path->n) {
+		struct point last_point = cur_path->points[cur_path->n-1];
+		append_point(last_point.x, last_point.y, last_point.straight);
+		int j;
+		for (j=cur_path->n-2; j>=i; j--) {
+			set_point(j+1, cur_path->points[j].x, cur_path->points[j].y, cur_path->points[j].straight);
+		}
+		set_point(i,x,y,is_straight);
+	}
+}
 
 //return the metapost string describing the path, eg (0,0)..(5,23)..(16,-27)
 char *path_to_string() {
