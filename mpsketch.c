@@ -14,7 +14,6 @@
 
 #define _NET_WM_STATE_ADD 1
 #define SUBINTERVALS 20 //how many straight sections to make up the bezier curve connecting two points
-#define INCH 72.0 //an inch is 72 postscript points
 #define XBM_FILENAME "mp-drawing.xbm"
 #define POINT_RADIUS 3 //for drawing a little circle around each point on the path
 #define SCROLL_STEP 10 //How many pixels to scroll at a time
@@ -27,10 +26,13 @@
 /*
 TODO: 
 port to gtk+
+take jobname.mp as first arg, rather than jobname
+do spaces in jobname stuff up the xbm?
 could create a new mp file by concatenating the save_coords macro and the source mp file then delete it (and the ps and log files) afterwards. that way the user wouldn't need to "input mpsketch-coords;"
-path editing: add points, remove point
 include instructions on how to get mplib in README
+if pushing a path outside current view, scroll to it
 move a vee
+edit point to v
 draw_path should work for circles too
 create mp file if it doesn't exist
 make points visible against black
@@ -43,19 +45,10 @@ create program that takes in path string, outputs control points, so a gui could
 consider generating ps internally rather than calling mpost. see section 2.2 of mplibapi.pdf
 config file to change keybindings?
 
-split into multiple files:
-	gui-related parts: event handling, displaying error messages, drawing circles and lines, convert mp coords to pixels, clipboard, move_point, trace
-	mptoraster: refresh/run mpost/get_coords/convert
-	paths: struct path, get control points, string to path, path to string, append_point, etc
-
-getopt:
-option for copy path only vs include "draw ...;"
-pass in filename (to support non-default outputtemplate)
-mpsketch -f filename -u units -p precision job_name fignum
-
 integration with vim: named pipe? 
 can read in lines from pipe into vim using :r !cat pipe
 vim can tell mpsketch to read path in by calling program that triggers XClientMessage, simulates keypress (p to read path from clipboard, r to redraw)
+When editing path already in mp file, could output replacement command, eg ':%s/(32,-17)\.\.(-106,85)/(31,-10)..(-130,85)/g'
 */
 
 Display *d;
@@ -79,7 +72,6 @@ bool finished_drawing=true; //if true then we're ready to start drawing another 
 char *job_name; //The part of the metapost filename before ".mp"
 char *fig_num; //metapost figure number (the "1" in "beginfig(1)" for example). Should be string rather than int because sometimes figure numbers are zero-padded, depending on the output template
 
-double unit = 1; //default is to use units of metapost points (1/72 inches). 
 int density = 100; //points per inch for bitmap. changes when we zoom in
 int x_offset=0; //for scrolling
 int y_offset=0;
@@ -113,16 +105,16 @@ void refresh(); //rerun metapost if necessary, otherwise just rerun convert (if 
 
 //Converting between metapost coords and xlib coords
 int mp_x_coord_to_pxl(double x) {
-	return round((x*unit - ll_x)/INCH*density - x_offset);
+	return round((x - ll_x)/INCH*density - x_offset);
 }
 int mp_y_coord_to_pxl(double y) {
-	return round(win_height - y_offset - (y*unit - ll_y)/INCH*density);
+	return round(win_height - y_offset - (y - ll_y)/INCH*density);
 }
 double pxl_to_mp_x_coord(int x) {
-	return ((x_offset + ((float) x))*INCH/density + ll_x)/unit;
+	return ((x_offset + ((float) x))*INCH/density + ll_x);
 }
 double pxl_to_mp_y_coord(int y) {
-	return ((-y_offset + win_height-((float) y))*INCH/density + ll_y)/unit;
+	return ((-y_offset + win_height-((float) y))*INCH/density + ll_y);
 }
 
 void draw_circle(double centre_x, double centre_y, int r) {
@@ -186,19 +178,55 @@ void copy_to_clipboard(char* s) {
 }
 
 int main(int argc, char **argv) {
+	unit = 1; //default is to use units of postscript points (1/72 inches). 
 	char *trace_filename;
 	int c;
+	strcpy(unit_name,"");
 	while ((c = getopt (argc, argv, "u:t:")) != -1)
 		switch (c)
 		{
-			case 'u':
-				unit = strtod(optarg,NULL);
+			case 'u': //units
+				;
+				/*Examples of usage:
+				u=5cm //print coords as '(2u,3u)' for example (meaning (10cm,15cm))
+				u=cm
+				5cm //print coords as (2,3) to mean (10cm,15cm)
+				u=72 //72 postscript points = 1 inch, so print '(2u,3u)' to mean (2in,3in)
+				72 //print '(2,3)' to mean (2in,3in)
+				mm //equivalent to mm=1mm
+				*/
+
+				bool valid;
+				//check for '=' in optarg
+				char *num = strchr(optarg,'=');
+				if (num) {
+					//take everything before the '=' as the unit_name
+					*num = '\0';
+					unit = string_to_bp(num+1,&valid); //need to do this before setting unit_name, because str_to_bp uses unit_name and an optarg like 'u=5u' shouldn't be valid
+					if (strlen(optarg) > sizeof(unit_name)-1) {
+						puts("Unit name too long");
+						return 1;
+					}
+					strcat(unit_name,optarg);
+				} else {
+					unit = string_to_bp(optarg,&valid);
+					if (isalpha(optarg[0]))
+						strcat(unit_name,optarg);
+				}
+
+				if (!valid) {
+					puts("Invalid measure in argument of -u");
+					puts("Usage: mpsketch -u [<unitname>=]<number>[cm|mm|in|pt|bp]");
+					puts("e.g. mpsketch -u u=2cm");
+					return 1;
+				}
 				break;
 			case 't':
 				show_trace = true;
 				trace_filename = optarg;
 				break;
 			case '?':
+				//TODO: print usage message
 				return 1;
 			default:
 				abort ();
@@ -337,6 +365,9 @@ void keypress(int keycode,int state) {
 		if (!finished_drawing) {
 			cur_path->cycle = true;
 			end_path();
+		} else if (edit) {
+			cur_path->cycle = !cur_path->cycle;
+			redraw_screen();
 		}
 		break;
 	case 43://d - delete a point
@@ -348,7 +379,7 @@ void keypress(int keycode,int state) {
 		break;
 	case 42://i - insert a point before current point
 		if (edit && edit_point > 0) {
-			get_controls();
+			find_control_points();
 			struct point p = cur_path->points[edit_point-1];
 			struct point q = cur_path->points[edit_point];
 			insert_point(edit_point,
@@ -362,7 +393,7 @@ void keypress(int keycode,int state) {
 		break;
 	case 38://a - insert a point after current point
 		if (edit && edit_point < cur_path->n-1) {
-			get_controls();
+			find_control_points();
 			struct point p = cur_path->points[edit_point];
 			struct point q = cur_path->points[edit_point+1];
 			insert_point(edit_point+1,
@@ -581,7 +612,7 @@ void link_point_pair(struct point *p, struct point *q) {
 	}
 }
 void draw_path() {
-	get_controls();
+	find_control_points();
 	
 	int i;
 	struct point *p,*q;

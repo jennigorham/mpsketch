@@ -9,6 +9,10 @@
 #include "mplib/mplib.h" //needed to get control points for bezier curve
 
 #define INITIAL_POINTS 10 //how many points to allocate space for initially
+#define INCH 72.0 //an inch is 72 postscript points
+
+char unit_name[20]; //might want it to write coords in terms of a variable, eg "(5u,2u)"
+double unit; //default unit in postscript points
 
 struct point {
 	double x,y,left_x,left_y,right_x,right_y;
@@ -21,16 +25,17 @@ struct path {
 	bool cycle;
 };
 
-struct path *cur_path;
+struct path *cur_path; //current path
 
 unsigned int coord_precision; //number of decimal places for printing coordinates
 
 void init_path(struct path *p);
 
+double string_to_bp(char *s,bool *valid); //return number of postscript points (aka big points, bp) from strings like 'cm', '5.2in', etc
 void string_to_path(char *buffer); //get path from string
 char *path_to_string(); //return the string defining the path
 
-void get_controls(); //find metapost's bezier control points for the path
+void find_control_points(); //find metapost's bezier control points for the path
 
 //edit a point
 void set_straight(int i,bool is_straight);

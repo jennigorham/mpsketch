@@ -7,8 +7,39 @@ void init_path(struct path *p) {
 	p->n = 0;
 }
 
+//return number of postscript points (aka big points, bp) from strings like 'cm', '5.2in', etc
+//string can have leading spaces, but not trailing spaces
+double string_to_bp(char *s,bool *valid) {
+	if (*s == '\0') {
+		if (valid) *valid = false;
+		return 0;
+	}
+	double bp;
+	char *unit_part; //pointer to the rest of the string following a valid number
+	if (valid) *valid = true;
+	bp = strtod(s,&unit_part);
+	if (unit_part == s) bp = 1; //string can be just 'cm' for example
+	if (*unit_part != 0) {
+		if (strcmp(unit_part,"mm") == 0)
+			bp *= INCH/25.4;
+		else if (strcmp(unit_part,"cm") == 0)
+			bp *= INCH/2.54;
+		else if (strcmp(unit_part,"in") == 0)
+			bp *= INCH;
+		else if (strcmp(unit_part,"pt") == 0)
+			bp *= INCH/72.27; //conversion between printer's points and postscript points
+		else if (strcmp(unit_part,unit_name) == 0)
+			bp *= unit;
+		else if (strcmp(unit_part,"bp") != 0)
+			if (valid) *valid = false;
+	//if there's no units on the number then assume they're in the default units. But if unit_name is set then assume they're in postscript points and leave as is
+	} else if (*unit_name == '\0') bp *= unit;
+	return bp;
+}
+
 //get a path from a string. Experimental, currently does no checking
 void string_to_path(char *s) {
+	//TODO: use strtok http://en.cppreference.com/w/c/string/byte/strtok
 	int i=1;
 	int j=i;
 	double x,y;
@@ -18,13 +49,13 @@ void string_to_path(char *s) {
 	while (true) {
 		while (j<l-1 && s[j] != ',') j++;
 		s[j] = '\0';
-		x = strtod(s+i,NULL);
+		x = string_to_bp(s+i,NULL);
 
 		i=j+1;
 		if (i >= l) break;
 		while (j<l-1 && s[j] != ')') j++;
 		s[j] = '\0';
-		y = strtod(s+i,NULL);
+		y = string_to_bp(s+i,NULL);
 
 		append_point(x,y,false);
 
@@ -40,7 +71,7 @@ void string_to_path(char *s) {
 }
 
 //find the bezier control points for all the points on the path
-void get_controls(struct path *p) {
+void find_control_points(struct path *p) {
 	MP mp;
 	mp_knot first_knot, last_knot;
 	MP_options * opt = mp_options () ;
@@ -149,20 +180,30 @@ char *path_to_string() {
 		delta_x = cur_path->points[0].x - cur_path->points[1].x;
 		delta_y = cur_path->points[0].y - cur_path->points[1].y;
 		r = sqrt(delta_x*delta_x + delta_y*delta_y);
-		snprintf(s, size, "fullcircle scaled %.*f shifted (%.*f,%.*f)",
-			coord_precision, 2*r,
-			coord_precision, cur_path->points[0].x,
-			coord_precision, cur_path->points[0].y
+		snprintf(s, size, "fullcircle scaled %.*f%s shifted (%.*f%s,%.*f%s)",
+			coord_precision, 2*r/unit,
+			unit_name,
+			coord_precision, cur_path->points[0].x/unit,
+			unit_name,
+			coord_precision, cur_path->points[0].y/unit,
+			unit_name
 		);
 	} else if (cur_path->n == 1) { //point
-		snprintf(s,size,"(%.*f,%.*f)",coord_precision,cur_path->points[0].x,coord_precision,cur_path->points[0].y);
+		snprintf(s,size,"(%.*f%s,%.*f%s)",
+			coord_precision,cur_path->points[0].x/unit,
+			unit_name,
+			coord_precision,cur_path->points[0].y/unit,
+			unit_name
+		);
 	} else if (cur_path->n > 1) { //path
-		char point[30];
+		char point[30 + 2*strlen(unit_name)];
 		int i;
 		for (i=0;i<cur_path->n;i++) {
-			snprintf(point,sizeof(point),"(%.*f,%.*f)",
-				coord_precision, cur_path->points[i].x,
-				coord_precision, cur_path->points[i].y
+			snprintf(point,sizeof(point),"(%.*f%s,%.*f%s)",
+				coord_precision, cur_path->points[i].x/unit,
+				unit_name,
+				coord_precision, cur_path->points[i].y/unit,
+				unit_name
 			); //should i print a warning here if there isn't enough space to fit the string? but that will never happen and wouldn't be a big problem if it did
 
 			if (strlen(s) + sizeof(point) + 20 > size) { //maybe not enough space to fit, so grow s
