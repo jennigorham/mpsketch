@@ -30,6 +30,7 @@ take jobname.mp as first arg, rather than jobname
 do spaces in jobname stuff up the xbm?
 could create a new mp file by concatenating the save_coords macro and the source mp file then delete it (and the ps and log files) afterwards. that way the user wouldn't need to "input mpsketch-coords;"
 include instructions on how to get mplib in README
+	also link to mpman: https://www.tug.org/docs/metapost/mpman.pdf
 if pushing a path outside current view, scroll to it
 move a vee
 edit point to v
@@ -319,9 +320,9 @@ void show_help() {
 	XFillRectangle(d,w,gc,0,0,win_width,win_height);
 	XSetForeground(d,gc,BlackPixel(d, s));
 	int pos = 1;
-	show_msg(pos++,"WYSIAWYG metapost editor.");
-	show_msg(pos++,"Press q to quit, r to redraw the metapost file, ? to show this help message.");
-	show_msg(pos++,"Metapost instructions are shown in stdout, and also copied to clipboard so you can add them to your mp file.");
+	show_msg(pos++,"MPSketch: a MetaPost GUI");
+	show_msg(pos++,"This program does not edit an mp file, but instead copies MetaPost paths to stdout and the clipboard");
+	show_msg(pos++,"so you can add them to your mp file.");
 	pos++;
 
 	show_msg(pos++,"Draw a path by clicking at points on the path. Escape will end the path, Enter will make it a cycle.");
@@ -339,6 +340,7 @@ void show_help() {
 	show_msg(pos++,"You can copy a path from your mp file to the clipboard, then edit it by pressing p (\"push\" a path)."); 
 	pos++;
 
+	show_msg(pos++,"Press q to quit, r to redraw the metapost file, ? to show this help message.");
 	show_msg(pos++,"Press h, l, k, or j to scroll left, right, up, or down, respectively. Or use scrollwheel.");
 	show_msg(pos++,"Press z or shift-z to zoom in or out. This will be slow.");
 

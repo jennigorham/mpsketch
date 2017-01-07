@@ -1,5 +1,7 @@
 mpsketch
+gtk-test
 test.[1-9]
 test.log
 test.mpx
 mplib
+*.png
