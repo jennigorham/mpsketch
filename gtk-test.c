@@ -1,6 +1,7 @@
 #include <gtk/gtk.h>
 #include <stdlib.h>
 #include <gdk/gdkkeysyms.h>
+#include <math.h>
 
 /*
 TODO:
@@ -8,25 +9,6 @@ how to quit
 tabs for different figures? http://www.cc.gatech.edu/data_files/public/doc/gtk/tutorial/gtk_tut-8.html
 menus? open, help, quit, show/hide trace, change units, precision, change figure
 may be possible to display the vector graphics without converting to png first: http://stackoverflow.com/questions/3672847/how-to-embed-evince
-*/
-
-/*
-//bezier spline
-cairo_move_to(cr,x0,y0);
-cairo_curve_to (cairo_t *cr,
-                double x1,
-                double y1,
-                double x2,
-                double y2,
-                double x3,
-                double y3);
-
-cairo_arc (cairo_t *cr,
-           double xc,
-           double yc,
-           double radius,
-           0,
-           0);
 */
 
 cairo_surface_t *mp_png;  
@@ -53,9 +35,21 @@ static gboolean on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data
 
 	cairo_set_source_rgb(cr, 0, 0, 0);
 	cairo_set_line_width(cr, 0.5);
+	//straight line
 	cairo_move_to(cr,10,10);
 	cairo_line_to(cr,100,100);
+	//circle
+	cairo_new_sub_path(cr);
+	cairo_arc(cr, 50, 100, 10, 0, 2*M_PI);
+	//bezier spline
+	cairo_move_to(cr,110,110);
+	cairo_curve_to(cr,120,110,140,140,150,140);
+
 	cairo_stroke(cr);
+
+	//filled circle
+	cairo_arc(cr, 10, 10, 3, 0, 2*M_PI);
+	cairo_fill(cr);
 
 	return FALSE;
 }
