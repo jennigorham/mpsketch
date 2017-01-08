@@ -3,9 +3,11 @@
 #include <gdk/gdkkeysyms.h>
 #include <math.h>
 
+#include "paths.h"
+#include "mptoraster.h"
+
 /*
 TODO:
-how to quit
 tabs for different figures? http://www.cc.gatech.edu/data_files/public/doc/gtk/tutorial/gtk_tut-8.html
 menus? open, help, quit, show/hide trace, change units, precision, change figure
 may be possible to display the vector graphics without converting to png first: http://stackoverflow.com/questions/3672847/how-to-embed-evince
@@ -59,6 +61,11 @@ static gboolean clicked(GtkWidget *widget, GdkEventButton *event, gpointer user_
 	return FALSE;
 }
 
+static gboolean button_release(GtkWidget *widget, GdkEventButton *event, gpointer user_data) {
+	printf("Button %d release, (%f,%f)\n",event->button,event->x,event->y);
+	return FALSE;
+}
+
 static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
 	printf("%d\n",event->keyval);
 	///usr/include/gtk-3.0/gdk/gdkkeysyms.h
@@ -70,6 +77,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer use
 			gint width,height;
 			gtk_window_get_size(GTK_WINDOW(widget), &width, &height);
 			printf("%d,%d\n",width,height);
+			break;
+		case GDK_KEY_q: ;
+			gtk_widget_destroy(widget);
 			break;
 		case GDK_KEY_y: ;
 			GtkClipboard *clip = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
@@ -103,7 +113,9 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	gtk_window_set_default_size (GTK_WINDOW (window), 200, 200);
 	gtk_widget_add_events(window, GDK_BUTTON_PRESS_MASK);
 	gtk_widget_add_events(window, GDK_POINTER_MOTION_MASK);
+	gtk_widget_add_events(window, GDK_BUTTON_RELEASE_MASK);
 	g_signal_connect(window, "button-press-event", G_CALLBACK(clicked), NULL);
+	g_signal_connect(window, "button-release-event", G_CALLBACK(button_release), NULL);
 	g_signal_connect(window, "key-press-event", G_CALLBACK (on_key_press), NULL);
 	g_signal_connect(window, "motion-notify-event", G_CALLBACK (on_motion), NULL);
 
