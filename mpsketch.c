@@ -40,7 +40,6 @@ make points visible against black
 arrow keys to scroll
 shift or scale path
 centre diagram on screen. also when zooming, zoom into centre
-make fig_num int? then how to handle zero-padding?
 remember past paths. key to clear paths. read in all paths in metapost file
 create program that takes in path string, outputs control points, so a gui could be made in a scripting language that calls it
 consider generating ps internally rather than calling mpost. see section 2.2 of mplibapi.pdf
@@ -71,7 +70,7 @@ int mode=CURVE_MODE; //default drawing mode
 bool finished_drawing=true; //if true then we're ready to start drawing another path or circle.
 
 char *job_name; //The part of the metapost filename before ".mp"
-char *fig_num; //metapost figure number (the "1" in "beginfig(1)" for example). Should be string rather than int because sometimes figure numbers are zero-padded, depending on the output template
+unsigned int fig_num; //metapost figure number (the "1" in "beginfig(1)" for example)
 
 int density = 100; //points per inch for bitmap. changes when we zoom in
 int x_offset=0; //for scrolling
@@ -237,8 +236,8 @@ int main(int argc, char **argv) {
 	if (argc > optind) job_name = argv[optind];
 	else job_name = "test";
 	if (argc > optind+1) {
-		fig_num = argv[optind+1];
-	} else fig_num = "1";
+		fig_num = atoi(argv[optind+1]);
+	} else fig_num = 1;
 	//TODO: create job_name.mp if it doesn't exist
 	
 	XEvent e;

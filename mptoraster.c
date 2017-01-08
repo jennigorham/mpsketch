@@ -12,7 +12,7 @@ int run_mpost(char *job_name) {
 	return system(cmd);
 }
 
-int get_coords(char *job_name, char *fig_num, float *ll_x, float *ll_y) {
+int get_coords(char *job_name, unsigned int fig_num, float *ll_x, float *ll_y) {
 	//Get the metapost coordinates of the lower left corner of the image
 	//There are three ways I can think of doing this.
 	//Method 1: use "show ..." in the metapost to write the coords to stdout then read them in with popen
@@ -47,9 +47,8 @@ int get_coords(char *job_name, char *fig_num, float *ll_x, float *ll_y) {
 		fprintf(stderr,"ERROR: couldn't open '%s.log'.\n",job_name);
 		return 1;
 	} else {
-		char substring[26 + strlen(fig_num)];
-		//strip leading zeroes off fig_num:
-		sprintf(substring,">> \"Figure %d x-coordinate:",atoi(fig_num));
+		char substring[50];
+		sprintf(substring,">> \"Figure %d x-coordinate:",fig_num);
 
 		while (fgets(buffer,sizeof(buffer),log) != NULL) {
 			buffer[strlen(substring)] = '\0';
@@ -106,13 +105,19 @@ int get_coords(char *job_name, char *fig_num, float *ll_x, float *ll_y) {
 	}*/
 }
 
-int make_bitmap(char *job_name, char *fig_num, int density, char *filename) {
+int make_bitmap(char *job_name, unsigned int fig_num, int density, char *filename) {
 	//TODO: if ps/pdf file not found, show message about leaving outputtemplate as default
-	char cmd[strlen("convert -density  -.pdf ") + (int) floor(log10(density)) + 2 + strlen(job_name) + strlen(fig_num) + strlen(filename) + 1]; //+2 is just in case floor(log10(density))+1 doesn't exactly give the number of chars needed for the density
+	char cmd[
+		strlen("convert -density  -.pdf ") +
+		(int) floor(log10(density)) + 1 + //chars in density
+		strlen(job_name) +
+		(int) floor(log10(fig_num)) + 1 + //chars in fig_num
+		strlen(filename) + 1
+	];
 	if (USE_MPTOPDF)
-		sprintf(cmd,"convert -density %d %s-%s.pdf %s",density,job_name,fig_num,filename);
+		sprintf(cmd,"convert -density %d %s-%d.pdf %s",density,job_name,fig_num,filename);
 	else
-		sprintf(cmd,"convert -density %d %s.%s %s",density,job_name,fig_num,filename);
+		sprintf(cmd,"convert -density %d %s.%d %s",density,job_name,fig_num,filename);
 	printf("\nRunning \"%s\"...\n\n",cmd);
 	int ret = system(cmd);
 	if (ret != 0) {

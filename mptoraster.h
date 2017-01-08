@@ -13,9 +13,9 @@
 //run metapost to create ps/pdf file
 int run_mpost(char *job_name);
 //get the coordinates of the lower left corner of the image, which are written in the logfile
-int get_coords(char *job_name, char *fig_num, float *ll_x, float *ll_y);
+int get_coords(char *job_name, unsigned int fig_num, float *ll_x, float *ll_y);
 //convert the ps/pdf to a raster image
-int make_bitmap(char *job_name, char *fig_num, int density, char *filename);
+int make_bitmap(char *job_name, unsigned int fig_num, int density, char *filename);
 //read in the raster
 int get_bitmap(char *filename, Display *d, Window w, Pixmap *bitmap, unsigned int *bitmap_width, unsigned int *bitmap_height);
 
