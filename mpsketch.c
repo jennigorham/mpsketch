@@ -181,7 +181,7 @@ int main(int argc, char **argv) {
 	unit = 1; //default is to use units of postscript points (1/72 inches). 
 	char *trace_filename;
 	int c;
-	strcpy(unit_name,"");
+	unit_name = "";
 	while ((c = getopt (argc, argv, "u:t:")) != -1)
 		switch (c)
 		{
@@ -203,15 +203,16 @@ int main(int argc, char **argv) {
 					//take everything before the '=' as the unit_name
 					*num = '\0';
 					unit = string_to_bp(num+1,&valid); //need to do this before setting unit_name, because str_to_bp uses unit_name and an optarg like 'u=5u' shouldn't be valid
-					if (strlen(optarg) > sizeof(unit_name)-1) {
+					/*if (strlen(optarg) > sizeof(unit_name)-1) {
 						puts("Unit name too long");
 						return 1;
-					}
-					strcat(unit_name,optarg);
+					}*/
+					unit_name = optarg;
 				} else {
 					unit = string_to_bp(optarg,&valid);
 					if (isalpha(optarg[0]))
-						strcat(unit_name,optarg);
+						//strcat(unit_name,optarg);
+						unit_name = optarg;
 				}
 
 				if (!valid) {
@@ -666,7 +667,7 @@ void redraw_screen() {
 			double delta_x,delta_y, r;
 			delta_x = cur_path->points[0].x - cur_path->points[1].x;
 			delta_y = cur_path->points[0].y - cur_path->points[1].y;
-			r = sqrt(delta_x*delta_x + delta_y*delta_y) / INCH * density * unit;
+			r = sqrt(delta_x*delta_x + delta_y*delta_y) / INCH * density;
 
 			draw_circle(cur_path->points[0].x,cur_path->points[0].y,(int) r);
 			draw_circle(cur_path->points[0].x,cur_path->points[0].y,POINT_RADIUS);

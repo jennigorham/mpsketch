@@ -11,7 +11,7 @@
 #define INITIAL_POINTS 10 //how many points to allocate space for initially
 #define INCH 72.0 //an inch is 72 postscript points
 
-char unit_name[20]; //might want it to write coords in terms of a variable, eg "(5u,2u)"
+char *unit_name; //might want it to write coords in terms of a variable, eg "(5u,2u)"
 double unit; //default unit in postscript points
 
 struct point {
