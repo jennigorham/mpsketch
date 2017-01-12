@@ -16,6 +16,7 @@ menus? open, help, quit, show/hide trace, change units, precision, change figure
 may be possible to display the vector graphics without converting to png first: http://stackoverflow.com/questions/3672847/how-to-embed-evince
 */
 
+#define POINT_RADIUS 3 //for drawing a little circle around each point on the path
 #define SCROLL_STEP 10 //How many pixels to scroll at a time
 
 #define CURVE_MODE 0
@@ -39,12 +40,13 @@ bool finished_drawing=true; //if true then we're ready to start drawing another 
 int density = 100; //points per inch for bitmap. changes when we zoom in
 int x_offset=0; //for scrolling
 int y_offset=0;
-unsigned int win_height = 600;
-unsigned int win_width = 800;
+gint win_height = 600;
+gint win_width = 800;
 
 // metapost coords of lower left corner of image
-float ll_x = 0;
-float ll_y = 0;
+//Coding these in for now until I set up mptoraster
+float ll_x = -359.35;
+float ll_y = -215.52;
 
 //when we mouse over a point in a completed path, we can edit it
 bool edit=false;
@@ -95,30 +97,71 @@ void draw_bezier(cairo_t *cr, double start_x, double start_y, double start_right
 		mp_y_coord_to_pxl(end_y));
 }
 
+void link_point_pair(cairo_t *cr, struct point *p, struct point *q) {
+	if (p->straight) {
+		cairo_move_to(
+			cr,
+			mp_x_coord_to_pxl(p->x),
+			mp_y_coord_to_pxl(p->y)
+		);
+		cairo_line_to(
+			cr,
+			mp_x_coord_to_pxl(q->x),
+			mp_y_coord_to_pxl(q->y)
+		);
+	} else {
+		draw_bezier(
+			cr,
+			p->x,
+			p->y,
+			p->right_x,
+			p->right_y,
+			q->left_x,
+			q->left_y,
+			q->x,
+			q->y
+		);
+	}
+}
+void draw_path(cairo_t *cr) {
+	find_control_points();
+	
+	int i;
+	struct point *p,*q;
+	for (i=0; i<cur_path->n-1; i++) {
+		p = &cur_path->points[i];
+		q = &cur_path->points[i+1];
+		draw_circle(cr,p->x,p->y, POINT_RADIUS);
+		link_point_pair(cr,p,q);
+	}
+	p = &cur_path->points[cur_path->n-1];
+	draw_circle(cr,p->x,p->y, POINT_RADIUS);
+	if (cur_path->cycle) {
+		q = &cur_path->points[0];
+		link_point_pair(cr,p,q);
+	}
+}
+
 static gboolean on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data) {
 	if (show_trace) {
 		cairo_set_source_surface(cr, trace, trace_x_offset, trace_y_offset);
 		cairo_paint(cr);
 	}
 
-	cairo_set_source_surface(cr, mp_png, -x_offset, -y_offset);
+	cairo_set_source_surface(cr, mp_png, -x_offset, -y_offset - cairo_image_surface_get_height(mp_png) + win_height);
 	cairo_paint(cr);
 
 	cairo_set_source_rgb(cr, 0, 0, 0);
 	cairo_set_line_width(cr, 0.5);
-	//circle
-	draw_circle(cr,0,0,5);
-	//straight line
-	cairo_move_to(cr,10,10);
-	cairo_line_to(cr,100,100);
-	//bezier spline
-	draw_bezier(cr,0,0,10,20,50,60,100,50);
-
-	cairo_stroke(cr);
 
 	//filled circle
 	cairo_arc(cr, 10, 10, 3, 0, 2*M_PI);
 	cairo_fill(cr);
+
+	if (cur_path->n > 1) {
+		draw_path(cr);
+		cairo_stroke(cr);
+	}
 
 	return FALSE;
 }
@@ -133,16 +176,18 @@ static gboolean button_release(GtkWidget *widget, GdkEventButton *event, gpointe
 	return FALSE;
 }
 
+static gboolean resize(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
+	gtk_window_get_size(GTK_WINDOW(widget), &win_width, &win_height);
+	//printf("Resize: %d,%d\n",win_width,win_height);
+	gtk_widget_queue_draw(widget);
+	return FALSE;
+}
+
 static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
 	///usr/include/gtk-3.0/gdk/gdkkeysyms.h
 	switch(event->keyval) {
 		case GDK_KEY_e: ;
 			show_error(GTK_WINDOW(widget));
-			break;
-		case GDK_KEY_w: ;
-			gint width,height;
-			gtk_window_get_size(GTK_WINDOW(widget), &width, &height);
-			printf("%d,%d\n",width,height);
 			break;
 		case GDK_KEY_q: ;
 			gtk_widget_destroy(widget);
@@ -154,6 +199,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer use
 			gchar *text = gtk_clipboard_wait_for_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
 			if (text != NULL) {
 				string_to_path(text);
+				gtk_widget_queue_draw(widget);
 			}
 			break;
 		default:
@@ -213,6 +259,7 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	g_signal_connect(window, "key-press-event", G_CALLBACK (on_key_press), NULL);
 	g_signal_connect(window, "motion-notify-event", G_CALLBACK (on_motion), NULL);
 	g_signal_connect(window, "scroll-event", G_CALLBACK (on_scroll), NULL);
+	g_signal_connect(window, "configure-event", G_CALLBACK(resize), NULL);
 
 	darea = gtk_drawing_area_new();
 	gtk_container_add(GTK_CONTAINER(window), darea);
