@@ -1,7 +1,7 @@
 #include "mptoraster.h"
 
 //run metapost on the file, generating a ps or pdf output
-int run_mpost(char *job_name) {
+int run_mpost() {
 	char cmd[strlen(job_name) + strlen("mpost --interaction=nonstopmode .mp") + 1];
 	if (USE_MPTOPDF)
 		sprintf(cmd,"mptopdf %s.mp",job_name);
@@ -12,7 +12,7 @@ int run_mpost(char *job_name) {
 	return system(cmd);
 }
 
-int get_coords(char *job_name, unsigned int fig_num, float *ll_x, float *ll_y) {
+int get_coords() {
 	//Get the metapost coordinates of the lower left corner of the image
 	//There are three ways I can think of doing this.
 	//Method 1: use "show ..." in the metapost to write the coords to stdout then read them in with popen
@@ -56,14 +56,14 @@ int get_coords(char *job_name, unsigned int fig_num, float *ll_x, float *ll_y) {
 				int i = strlen(substring) + 1;
 				while (buffer[i] != '"' && i < sizeof(buffer)-1) i++;
 				buffer[i] = '\0';
-				*ll_x = strtof(buffer+strlen(substring)+1,NULL);
+				ll_x = strtof(buffer+strlen(substring)+1,NULL);
 
 				fgets(buffer,sizeof(buffer),log); //y-coordinate will be on next line
 				i = strlen(substring) + 1;
 				while (buffer[i] != '"') i++;
 				buffer[i] = '\0';
-				*ll_y = strtof(buffer+strlen(substring)+1,NULL);
-				if (!USE_MPTOPDF) *ll_y -= 0.8; //The vertical coordinate seems to be off by about 0.8pt when using mpost. I don't know why. 
+				ll_y = strtof(buffer+strlen(substring)+1,NULL);
+				if (!USE_MPTOPDF) ll_y -= 0.8; //The vertical coordinate seems to be off by about 0.8pt when using mpost. I don't know why. 
 				found_coords = true;
 				break;
 			}
@@ -105,7 +105,7 @@ int get_coords(char *job_name, unsigned int fig_num, float *ll_x, float *ll_y) {
 	}*/
 }
 
-int make_bitmap(char *job_name, unsigned int fig_num, int density, char *filename) {
+int make_bitmap(char *filename) {
 	//TODO: if ps/pdf file not found, show message about leaving outputtemplate as default
 	char cmd[
 		strlen("convert -density  -.pdf ") +

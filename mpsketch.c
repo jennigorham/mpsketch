@@ -11,21 +11,16 @@
 
 #include "paths.h"
 #include "mptoraster.h"
+#include "common.h"
 
 #define _NET_WM_STATE_ADD 1
 #define SUBINTERVALS 20 //how many straight sections to make up the bezier curve connecting two points
 #define XBM_FILENAME "mp-drawing.xbm"
-#define POINT_RADIUS 3 //for drawing a little circle around each point on the path
-#define SCROLL_STEP 10 //How many pixels to scroll at a time
-
-#define CURVE_MODE 0
-#define STRAIGHT_MODE 1
-#define CORNER_MODE 2
-#define CIRCLE_MODE 3
 
 /*
 TODO: 
 port to gtk+
+string_to_path for circles
 take jobname.mp as first arg, rather than jobname
 do spaces in jobname stuff up the xbm?
 could create a new mp file by concatenating the save_coords macro and the source mp file then delete it (and the ps and log files) afterwards. that way the user wouldn't need to "input mpsketch-coords;"
@@ -34,7 +29,6 @@ include instructions on how to get mplib in README
 if pushing a path outside current view, scroll to it
 move a vee
 edit point to v
-draw_path should work for circles too
 create mp file if it doesn't exist
 make points visible against black
 arrow keys to scroll
@@ -60,31 +54,10 @@ Pixmap bitmap; //metapost output, converted to bitmap
 unsigned int bitmap_width, bitmap_height;
 
 Pixmap tracing_bitmap;
-int trace_x_offset,trace_y_offset;
 void get_trace();
-bool show_trace = false;
 
 bool quit=false;
 bool help=true; //show help message
-int mode=CURVE_MODE; //default drawing mode
-bool finished_drawing=true; //if true then we're ready to start drawing another path or circle.
-
-char *job_name; //The part of the metapost filename before ".mp"
-unsigned int fig_num; //metapost figure number (the "1" in "beginfig(1)" for example)
-
-int density = 100; //points per inch for bitmap. changes when we zoom in
-int x_offset=0; //for scrolling
-int y_offset=0;
-unsigned int win_height = 600;
-unsigned int win_width = 800;
-
-// metapost coords of lower left corner of image
-float ll_x = 0;
-float ll_y = 0;
-
-//when we mouse over a point in a completed path, we can edit it
-bool edit=false;
-int edit_point; //which point are we editing
 
 void button_release(short x,short y,int button); //do stuff when mouse button is pressed
 void keypress(int keycode,int state); //do stuff when a key is pressed
@@ -95,27 +68,11 @@ void show_help(); //display message about usage
 void show_msg(int pos,char *msg); //display message
 
 void redraw_screen(); //draw bitmap on screen, then draw the path
-void draw_path();
-void link_point_pair(struct point *p, struct point *q); //draw either a straight line or a bezier curve linking two consecutive points on a path
 double bezier(double start, double start_right, double end_left, double end, double t);
 void draw_bezier(double start_x, double start_y, double start_right_x, double start_right_y, double end_left_x, double end_left_y, double end_x, double end_y); //draw the cubic bezier curve connecting two points
 
 void output_path();//print the path and copy to clipboard
 void refresh(); //rerun metapost if necessary, otherwise just rerun convert (if metapost has already been run from elsewhere).
-
-//Converting between metapost coords and xlib coords
-int mp_x_coord_to_pxl(double x) {
-	return round((x - ll_x)/INCH*density - x_offset);
-}
-int mp_y_coord_to_pxl(double y) {
-	return round(win_height - y_offset - (y - ll_y)/INCH*density);
-}
-double pxl_to_mp_x_coord(int x) {
-	return ((x_offset + ((float) x))*INCH/density + ll_x);
-}
-double pxl_to_mp_y_coord(int y) {
-	return ((-y_offset + win_height-((float) y))*INCH/density + ll_y);
-}
 
 void draw_circle(double centre_x, double centre_y, int r) {
 		XDrawArc(d,w,gc, mp_x_coord_to_pxl(centre_x) - r, mp_y_coord_to_pxl(centre_y) - r, 2*r, 2*r, 0, 360*64);
@@ -180,6 +137,7 @@ void copy_to_clipboard(char* s) {
 int main(int argc, char **argv) {
 	unit = 1; //default is to use units of postscript points (1/72 inches). 
 	char *trace_filename;
+	show_trace = false;
 	int c;
 	unit_name = "";
 	while ((c = getopt (argc, argv, "u:t:")) != -1)
@@ -240,6 +198,14 @@ int main(int argc, char **argv) {
 		fig_num = atoi(argv[optind+1]);
 	} else fig_num = 1;
 	//TODO: create job_name.mp if it doesn't exist
+
+	density = 100;
+	finished_drawing=true;
+	mode = CURVE_MODE;
+	edit=false;
+
+	win_width = 400;
+	win_height = 400;
 	
 	XEvent e;
 
@@ -434,7 +400,7 @@ void keypress(int keycode,int state) {
 	case 61://z - zoom
 		if (state & ShiftMask) density/=2; //shift-z zooms out
 		else density*=2;
-		if (make_bitmap(job_name,fig_num,density,XBM_FILENAME) == 0 && get_bitmap(XBM_FILENAME,d,w,&bitmap,&bitmap_width,&bitmap_height) == 0) {
+		if (make_bitmap(XBM_FILENAME) == 0 && get_bitmap(XBM_FILENAME,d,w,&bitmap,&bitmap_width,&bitmap_height) == 0) {
 			remove(XBM_FILENAME);
 			redraw_screen();
 		} else error();
@@ -578,12 +544,12 @@ void refresh() {
 	}*/
 	box_msg("Running metapost...");
 	XFlush(d); //Xlib won't update the screen while metapost runs unless we do this
-	if (run_mpost(job_name) != 0 || get_coords(job_name,fig_num,&ll_x, &ll_y) != 0) {
+	if (run_mpost() != 0 || get_coords() != 0) {
 		error();
 	} else {
 		box_msg("Creating raster image...");
 		XFlush(d);
-		if (make_bitmap(job_name,fig_num,density,XBM_FILENAME) != 0 || get_bitmap(XBM_FILENAME,d,w,&bitmap,&bitmap_width,&bitmap_height) != 0) {
+		if (make_bitmap(XBM_FILENAME) != 0 || get_bitmap(XBM_FILENAME,d,w,&bitmap,&bitmap_width,&bitmap_height) != 0) {
 			error();
 		} else {
 			remove(XBM_FILENAME);
@@ -611,24 +577,6 @@ void link_point_pair(struct point *p, struct point *q) {
 			q->x,
 			q->y
 		);
-	}
-}
-void draw_path() {
-	find_control_points();
-	
-	int i;
-	struct point *p,*q;
-	for (i=0; i<cur_path->n-1; i++) {
-		p = &cur_path->points[i];
-		q = &cur_path->points[i+1];
-		draw_circle(p->x,p->y, POINT_RADIUS);
-		link_point_pair(p,q);
-	}
-	p = &cur_path->points[cur_path->n-1];
-	draw_circle(p->x,p->y, POINT_RADIUS);
-	if (cur_path->cycle) {
-		q = &cur_path->points[0];
-		link_point_pair(p,q);
 	}
 }
 
@@ -659,21 +607,8 @@ void redraw_screen() {
 				0, 0,
 				1);
 		}
-		//draw the current path
-		if (cur_path->n > 1) draw_path();
-		else if (cur_path->n == 1 && finished_drawing)
-			draw_circle(cur_path->points[0].x,cur_path->points[0].y,POINT_RADIUS); 
-		else if ((mode == CIRCLE_MODE && !finished_drawing) || cur_path->n == -1) {//a circle is being drawn or has just been drawn
-			double delta_x,delta_y, r;
-			delta_x = cur_path->points[0].x - cur_path->points[1].x;
-			delta_y = cur_path->points[0].y - cur_path->points[1].y;
-			r = sqrt(delta_x*delta_x + delta_y*delta_y) / INCH * density;
 
-			draw_circle(cur_path->points[0].x,cur_path->points[0].y,(int) r);
-			draw_circle(cur_path->points[0].x,cur_path->points[0].y,POINT_RADIUS);
-			draw_circle(cur_path->points[1].x,cur_path->points[1].y,POINT_RADIUS);
-		}
-
+		draw_path();
 		if (edit)
 			fill_circle(cur_path->points[edit_point].x,cur_path->points[edit_point].y,POINT_RADIUS);
 	}

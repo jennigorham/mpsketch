@@ -3,11 +3,10 @@
 #include <stdlib.h>
 #include <gdk/gdkkeysyms.h>
 #include <math.h>
-#include <ctype.h>
-#include <unistd.h>
 
 #include "paths.h"
 #include "mptoraster.h"
+#include "common.h"
 
 /*
 TODO:
@@ -16,55 +15,9 @@ menus? open, help, quit, show/hide trace, change units, precision, change figure
 may be possible to display the vector graphics without converting to png first: http://stackoverflow.com/questions/3672847/how-to-embed-evince
 */
 
-#define POINT_RADIUS 3 //for drawing a little circle around each point on the path
-#define SCROLL_STEP 10 //How many pixels to scroll at a time
-
-#define CURVE_MODE 0
-#define STRAIGHT_MODE 1
-#define CORNER_MODE 2
-#define CIRCLE_MODE 3
-
 cairo_surface_t *mp_png;  
-
 cairo_surface_t *trace;  
-char *trace_filename;
-int trace_x_offset,trace_y_offset;
-bool show_trace = false;
-
-char *job_name; //The part of the metapost filename before ".mp"
-unsigned int fig_num; //metapost figure number (the "1" in "beginfig(1)" for example)
-
-int mode=CURVE_MODE; //default drawing mode
-bool finished_drawing=true; //if true then we're ready to start drawing another path or circle.
-
-int density = 100; //points per inch for bitmap. changes when we zoom in
-int x_offset=0; //for scrolling
-int y_offset=0;
-gint win_height = 600;
-gint win_width = 800;
-
-// metapost coords of lower left corner of image
-//Coding these in for now until I set up mptoraster
-float ll_x = -359.35;
-float ll_y = -215.52;
-
-//when we mouse over a point in a completed path, we can edit it
-bool edit=false;
-int edit_point; //which point are we editing
-
-//Converting between metapost coords and xlib coords
-int mp_x_coord_to_pxl(double x) {
-	return round((x - ll_x)/INCH*density - x_offset);
-}
-int mp_y_coord_to_pxl(double y) {
-	return round(win_height - y_offset - (y - ll_y)/INCH*density);
-}
-double pxl_to_mp_x_coord(int x) {
-	return ((x_offset + ((float) x))*INCH/density + ll_x);
-}
-double pxl_to_mp_y_coord(int y) {
-	return ((-y_offset + win_height-((float) y))*INCH/density + ll_y);
-}
+cairo_t *cr;
 
 void show_error(gpointer window) {//http://zetcode.com/gui/gtk2/gtkdialogs/
 	GtkWidget *dialog;
@@ -78,12 +31,12 @@ void show_error(gpointer window) {//http://zetcode.com/gui/gtk2/gtkdialogs/
 	gtk_widget_destroy(dialog);
 }
 
-void draw_circle(cairo_t *cr, double centre_x, double centre_y, int r) {
+void draw_circle(double centre_x, double centre_y, int r) {
 	cairo_new_sub_path(cr);
 	cairo_arc(cr, mp_x_coord_to_pxl(centre_x), mp_y_coord_to_pxl(centre_y), r, 0, 2*M_PI);
 }
 
-void draw_bezier(cairo_t *cr, double start_x, double start_y, double start_right_x, double start_right_y, double end_left_x, double end_left_y, double end_x, double end_y) {
+void draw_bezier(double start_x, double start_y, double start_right_x, double start_right_y, double end_left_x, double end_left_y, double end_x, double end_y) {
 	cairo_new_sub_path(cr);
 	cairo_move_to(cr,
 		mp_x_coord_to_pxl(start_x),
@@ -97,7 +50,7 @@ void draw_bezier(cairo_t *cr, double start_x, double start_y, double start_right
 		mp_y_coord_to_pxl(end_y));
 }
 
-void link_point_pair(cairo_t *cr, struct point *p, struct point *q) {
+void link_point_pair(struct point *p, struct point *q) {
 	if (p->straight) {
 		cairo_move_to(
 			cr,
@@ -111,7 +64,6 @@ void link_point_pair(cairo_t *cr, struct point *p, struct point *q) {
 		);
 	} else {
 		draw_bezier(
-			cr,
 			p->x,
 			p->y,
 			p->right_x,
@@ -123,26 +75,8 @@ void link_point_pair(cairo_t *cr, struct point *p, struct point *q) {
 		);
 	}
 }
-void draw_path(cairo_t *cr) {
-	find_control_points();
-	
-	int i;
-	struct point *p,*q;
-	for (i=0; i<cur_path->n-1; i++) {
-		p = &cur_path->points[i];
-		q = &cur_path->points[i+1];
-		draw_circle(cr,p->x,p->y, POINT_RADIUS);
-		link_point_pair(cr,p,q);
-	}
-	p = &cur_path->points[cur_path->n-1];
-	draw_circle(cr,p->x,p->y, POINT_RADIUS);
-	if (cur_path->cycle) {
-		q = &cur_path->points[0];
-		link_point_pair(cr,p,q);
-	}
-}
-
-static gboolean on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data) {
+static gboolean on_draw_event(GtkWidget *widget, cairo_t *this_cr, gpointer user_data) {
+	cr = this_cr; //make it global. Otherwise I'd have to pass it to draw_path which would no longer be common between the xlib and gtk versions
 	if (show_trace) {
 		cairo_set_source_surface(cr, trace, trace_x_offset, trace_y_offset);
 		cairo_paint(cr);
@@ -155,13 +89,11 @@ static gboolean on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data
 	cairo_set_line_width(cr, 0.5);
 
 	//filled circle
-	cairo_arc(cr, 10, 10, 3, 0, 2*M_PI);
-	cairo_fill(cr);
+	//cairo_arc(cr, 10, 10, 3, 0, 2*M_PI);
+	//cairo_fill(cr);
 
-	if (cur_path->n > 1) {
-		draw_path(cr);
-		cairo_stroke(cr);
-	}
+	draw_path();
+	cairo_stroke(cr);
 
 	return FALSE;
 }
@@ -172,27 +104,81 @@ static gboolean clicked(GtkWidget *widget, GdkEventButton *event, gpointer user_
 }
 
 static gboolean button_release(GtkWidget *widget, GdkEventButton *event, gpointer user_data) {
-	printf("Button %d release, (%f,%f)\n",event->button,event->x,event->y);
+	//printf("Button %d release, (%f,%f)\n",event->button,event->x,event->y);
+	if (event->button == 1 && !edit) {
+		if (mode == CIRCLE_MODE) {
+			if (finished_drawing) { //start a new circle
+				cur_path->n = 0;
+				set_coords(0,pxl_to_mp_x_coord(event->x),pxl_to_mp_y_coord(event->y));
+				finished_drawing = false;
+			} else {
+				finished_drawing=true;
+				cur_path->n = -1;
+				//output_path();
+			}
+		} else {
+			if (finished_drawing) {//start a new path
+				cur_path->cycle = false;
+				finished_drawing = false;
+				cur_path->n = 1;
+			} 
+			set_last_point(
+				pxl_to_mp_x_coord(event->x),
+				pxl_to_mp_y_coord(event->y),
+				mode!=CURVE_MODE
+			);
+			if (mode == CORNER_MODE) {
+				mode = CURVE_MODE;
+				append_point(
+					pxl_to_mp_x_coord(event->x),
+					pxl_to_mp_y_coord(event->y),
+					false
+				);
+			}
+			gtk_widget_queue_draw(widget);
+			//point under cursor
+			append_point(
+				pxl_to_mp_x_coord(event->x),
+				pxl_to_mp_y_coord(event->y),
+				false
+			);
+		}
+	}
 	return FALSE;
 }
 
 static gboolean resize(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
-	gtk_window_get_size(GTK_WINDOW(widget), &win_width, &win_height);
+	gint width,height;
+	gtk_window_get_size(GTK_WINDOW(widget), &width, &height);
+	win_width = (unsigned int) width;
+	win_height = (unsigned int) height;
 	//printf("Resize: %d,%d\n",win_width,win_height);
 	gtk_widget_queue_draw(widget);
 	return FALSE;
 }
 
-static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
+static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
 	///usr/include/gtk-3.0/gdk/gdkkeysyms.h
 	switch(event->keyval) {
-		case GDK_KEY_e: ;
+		case GDK_KEY_e:
 			show_error(GTK_WINDOW(widget));
 			break;
-		case GDK_KEY_q: ;
+		case GDK_KEY_q:
 			gtk_widget_destroy(widget);
 			break;
-		case GDK_KEY_y: ;
+		case GDK_KEY_minus:
+			mode=STRAIGHT_MODE;
+			if (!finished_drawing) set_straight(cur_path->n-2,true);
+			else if (edit) set_straight(edit_point,true);
+			gtk_widget_queue_draw(widget);
+			break;
+		case GDK_KEY_period:
+			mode=CURVE_MODE;
+			if (!finished_drawing) set_straight(cur_path->n-2,false);
+			else if (edit) set_straight(edit_point,false);
+			gtk_widget_queue_draw(widget);
+			break;
+		case GDK_KEY_y:
 			gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD), "test", -1);
 			break;
 		case GDK_KEY_p: ;
@@ -256,7 +242,7 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	gtk_widget_add_events(window, GDK_SCROLL_MASK);
 	g_signal_connect(window, "button-press-event", G_CALLBACK(clicked), NULL);
 	g_signal_connect(window, "button-release-event", G_CALLBACK(button_release), NULL);
-	g_signal_connect(window, "key-press-event", G_CALLBACK (on_key_press), NULL);
+	g_signal_connect(window, "key-press-event", G_CALLBACK (key_press), NULL);
 	g_signal_connect(window, "motion-notify-event", G_CALLBACK (on_motion), NULL);
 	g_signal_connect(window, "scroll-event", G_CALLBACK (on_scroll), NULL);
 	g_signal_connect(window, "configure-event", G_CALLBACK(resize), NULL);
@@ -304,11 +290,9 @@ static gboolean get_unit(gchar *option_name,gchar *value,gpointer data,GError **
 }
 static gboolean get_trace(gchar *option_name,gchar *value,gpointer data,GError **error) {
 	show_trace = true;
-	trace_filename = value;
-
 	trace_x_offset = 0;
 	trace_y_offset = 0;
-	trace = cairo_image_surface_create_from_png(trace_filename);
+	trace = cairo_image_surface_create_from_png(value);
 	if (cairo_surface_status(trace) != CAIRO_STATUS_SUCCESS) {
 		g_print("Couldn't get trace image.\n");
 		return FALSE;
@@ -323,6 +307,15 @@ int main (int argc, char **argv) {
 	coord_precision = 0;
 	unit_name = "";
 	fig_num = 1;
+	mode = CURVE_MODE;
+	density = 100;
+	finished_drawing=true;
+	show_trace = false;
+	edit=false;
+
+	//Coding these in for now until I set up mptoraster
+	ll_x = -359.35;
+	ll_y = -215.52;
 
 	GOptionEntry entries[] =
 	{
