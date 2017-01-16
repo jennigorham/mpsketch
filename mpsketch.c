@@ -270,13 +270,6 @@ int main(int argc, char **argv) {
 	XCloseDisplay(d);
 	return 0;
 }
-
-void end_path() {
-	cur_path->n--; //remove the extra point under the cursor. for circles, sets n to -1 so we know it's a circle
-	output_path();
-	finished_drawing=true;
-	redraw_screen();
-}
 void show_msg(int pos,char *msg) {
 	XDrawString(d, w, gc, 10, 20*pos, msg, strlen(msg));
 }
@@ -372,16 +365,10 @@ void keypress(int keycode,int state) {
 		}
 		break;
 	case 26://period
-		mode=CURVE_MODE;
-		if (!finished_drawing) set_straight(cur_path->n-2,false);
-		else if (edit) set_straight(edit_point,false);
-		redraw_screen();
+		path_mode_change(false);
 		break;
 	case 48://dash
-		mode=STRAIGHT_MODE;
-		if (!finished_drawing) set_straight(cur_path->n-2,true);
-		else if (edit) set_straight(edit_point,true);
-		redraw_screen();
+		path_mode_change(true);
 		break;
 	case 27: //p - push path string onto the screen
 		get_path_from_clipboard();

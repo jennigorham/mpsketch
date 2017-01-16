@@ -139,16 +139,10 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 			gtk_widget_destroy(widget);
 			break;
 		case GDK_KEY_minus:
-			mode=STRAIGHT_MODE;
-			if (!finished_drawing) set_straight(cur_path->n-2,true);
-			else if (edit) set_straight(edit_point,true);
-			redraw_screen();
+			path_mode_change(true);
 			break;
 		case GDK_KEY_period:
-			mode=CURVE_MODE;
-			if (!finished_drawing) set_straight(cur_path->n-2,false);
-			else if (edit) set_straight(edit_point,false);
-			redraw_screen();
+			path_mode_change(false);
 			break;
 		case GDK_KEY_y:
 			output_path();

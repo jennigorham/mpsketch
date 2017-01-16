@@ -96,3 +96,23 @@ void click_point(int x, int y) {
 	}
 	redraw_screen();
 }
+
+void end_path() {
+	cur_path->n--; //remove the extra point under the cursor. for circles, sets n to -1 so we know it's a circle
+	output_path();
+	finished_drawing=true;
+	redraw_screen();
+}
+
+void path_mode_change(bool is_straight) {
+	if (!finished_drawing) {
+		if (mode==CIRCLE_MODE) end_path();
+		else set_straight(cur_path->n-2,is_straight);
+	}
+	else if (edit) set_straight(edit_point,is_straight);
+
+	if (is_straight) mode=STRAIGHT_MODE;
+	else mode = CURVE_MODE;
+
+	redraw_screen();
+}
