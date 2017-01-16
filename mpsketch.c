@@ -61,7 +61,7 @@ bool help=true; //show help message
 
 void button_release(short x,short y,int button); //do stuff when mouse button is pressed
 void keypress(int keycode,int state); //do stuff when a key is pressed
-void pointer_move(short x,short y);
+void pointer_move(int x,int y);
 void move_point(); //when you click and drag a point on a path/circle
 
 void show_help(); //display message about usage
@@ -254,7 +254,7 @@ int main(int argc, char **argv) {
 			button_release(e.xbutton.x,e.xbutton.y,e.xbutton.button);
 			break;
 		case MotionNotify:
-			pointer_move(e.xmotion.x,e.xmotion.y);
+			if (!help) pointer_move((int) e.xmotion.x,(int) e.xmotion.y);
 			break;
 		case KeyPress:
 			keypress(e.xkey.keycode,e.xkey.state);
@@ -458,45 +458,9 @@ void move_point() {
 	}
 }
 
-void button_release(short x, short y,int button) {
+void button_release(short x, short y, int button) {
 	if (button == 1) {
-		if (mode == CIRCLE_MODE) {
-			if (finished_drawing) { //start a new circle
-				cur_path->n = 0;
-				set_coords(0,pxl_to_mp_x_coord(x),pxl_to_mp_y_coord(y));
-				finished_drawing = false;
-			} else {
-				finished_drawing=true;
-				cur_path->n = -1;
-				output_path();
-			}
-		} else {
-			if (finished_drawing) {//start a new path
-				cur_path->cycle = false;
-				finished_drawing = false;
-				cur_path->n = 1;
-			} 
-			set_last_point(
-				pxl_to_mp_x_coord(x),
-				pxl_to_mp_y_coord(y),
-				mode!=CURVE_MODE
-			);
-			if (mode == CORNER_MODE) {
-				mode = CURVE_MODE;
-				append_point(
-					pxl_to_mp_x_coord(x),
-					pxl_to_mp_y_coord(y),
-					false
-				);
-			}
-			redraw_screen();
-			//point under cursor
-			append_point(
-				pxl_to_mp_x_coord(x),
-				pxl_to_mp_y_coord(y),
-				false
-			);
-		}
+		click_point((int) x, (int) y);
 	} else if (button == 4) {
 		y_offset -=SCROLL_STEP;
 		redraw_screen();
@@ -603,14 +567,14 @@ void redraw_screen() {
 	}
 }
 
-void pointer_move(short x,short y) {
+void pointer_move(int x,int y) {
 	if (!finished_drawing) {
 		if (mode == CIRCLE_MODE)
 			set_coords(1,pxl_to_mp_x_coord(x),pxl_to_mp_y_coord(y));
 		else
 			set_coords(cur_path->n-1,pxl_to_mp_x_coord(x),pxl_to_mp_y_coord(y));
 		redraw_screen();
-	} else if (!help) {
+	} else {
 		//if the user mouses over a point on the path, they can edit it (drag it, change the section after it to straight/curved)
 		int i;
 		edit=false;

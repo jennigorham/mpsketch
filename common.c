@@ -54,3 +54,45 @@ void output_path() {
 	else if (cur_path->n == 1)
 		printf("drawdot %s;\n",s);
 }
+
+void click_point(int x, int y) {
+	if (mode == CIRCLE_MODE) {
+		if (finished_drawing) { //start a new circle
+			cur_path->n = 0;
+			set_coords(0,pxl_to_mp_x_coord(x),pxl_to_mp_y_coord(y));
+			set_coords(1,pxl_to_mp_x_coord(x),pxl_to_mp_y_coord(y));
+			finished_drawing = false;
+		} else {
+			set_coords(1,pxl_to_mp_x_coord(x),pxl_to_mp_y_coord(y));
+			finished_drawing=true;
+			cur_path->n = -1;
+			output_path();
+		}
+	} else {
+		if (finished_drawing) {//start a new path
+			cur_path->cycle = false;
+			finished_drawing = false;
+			cur_path->n = 1;
+		} 
+		set_last_point(
+			pxl_to_mp_x_coord(x),
+			pxl_to_mp_y_coord(y),
+			mode!=CURVE_MODE
+		);
+		if (mode == CORNER_MODE) {
+			mode = CURVE_MODE;
+			append_point(
+				pxl_to_mp_x_coord(x),
+				pxl_to_mp_y_coord(y),
+				false
+			);
+		}
+		//point under cursor
+		append_point(
+			pxl_to_mp_x_coord(x),
+			pxl_to_mp_y_coord(y),
+			false
+		);
+	}
+	redraw_screen();
+}

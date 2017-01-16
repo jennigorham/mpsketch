@@ -19,6 +19,8 @@ cairo_surface_t *mp_png;
 cairo_surface_t *trace;  
 cairo_t *cr;
 
+GtkWidget *darea;
+
 void show_error(gpointer window) {//http://zetcode.com/gui/gtk2/gtkdialogs/
 	GtkWidget *dialog;
 	dialog = gtk_message_dialog_new(GTK_WINDOW(window),
@@ -104,51 +106,13 @@ static gboolean clicked(GtkWidget *widget, GdkEventButton *event, gpointer user_
 }
 
 static gboolean button_release(GtkWidget *widget, GdkEventButton *event, gpointer user_data) {
-	//printf("Button %d release, (%f,%f)\n",event->button,event->x,event->y);
-	if (event->button == 1 && !edit) {
-		if (mode == CIRCLE_MODE) {
-			if (finished_drawing) { //start a new circle
-				cur_path->n = 0;
-				set_coords(0,pxl_to_mp_x_coord(event->x),pxl_to_mp_y_coord(event->y));
-				finished_drawing = false;
-			} else {
-				finished_drawing=true;
-				cur_path->n = -1;
-				//output_path();
-			}
-		} else {
-			if (finished_drawing) {//start a new path
-				cur_path->cycle = false;
-				finished_drawing = false;
-				cur_path->n = 1;
-			} 
-			set_last_point(
-				pxl_to_mp_x_coord(event->x),
-				pxl_to_mp_y_coord(event->y),
-				mode!=CURVE_MODE
-			);
-			if (mode == CORNER_MODE) {
-				mode = CURVE_MODE;
-				append_point(
-					pxl_to_mp_x_coord(event->x),
-					pxl_to_mp_y_coord(event->y),
-					false
-				);
-			}
-			redraw_screen();
-			//point under cursor
-			append_point(
-				pxl_to_mp_x_coord(event->x),
-				pxl_to_mp_y_coord(event->y),
-				false
-			);
-		}
-	}
+	if (event->button == 1 && !edit) 
+		click_point(event->x,event->y);
 	return FALSE;
 }
 
 void redraw_screen() {
-	gtk_widget_queue_draw(widget);
+	gtk_widget_queue_draw(darea);
 }
 
 static gboolean resize(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
@@ -235,7 +199,6 @@ static gboolean on_scroll(GtkWidget* widget, GdkEventScroll* event, gpointer use
 
 static void activate (GtkApplication* app, gpointer user_data) {
 	GtkWidget *window;
-	GtkWidget *darea;
 
 	cur_path = malloc(sizeof(struct path));
 	init_path(cur_path);

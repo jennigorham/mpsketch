@@ -39,7 +39,8 @@ bool edit;
 int edit_point; //which point are we editing
 
 void draw_path(); //draw the current path or circle
-void output_path();
+void output_path(); //print path to clipboard and stdout
+void click_point(int x, int y); //when the user clicks to add a point to the path, or create a circle
 
 //defined in mpsketch.c or gtk-test.c
 void draw_circle(double centre_x, double centre_y, int r);
