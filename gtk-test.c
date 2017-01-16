@@ -132,6 +132,22 @@ void copy_to_clipboard(char *s) {
 static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
 	///usr/include/gtk-3.0/gdk/gdkkeysyms.h
 	switch(event->keyval) {
+		case GDK_KEY_Escape:
+			if (finished_drawing) { //clear
+				cur_path->n = 0;
+				redraw_screen();
+			} else
+				end_path();
+			break;
+		case GDK_KEY_Return:
+			if (!finished_drawing) {
+				cur_path->cycle = true;
+				end_path();
+			} else if (edit) {
+				cur_path->cycle = !cur_path->cycle;
+				redraw_screen();
+			}
+			break;
 		case GDK_KEY_e:
 			show_error(GTK_WINDOW(widget));
 			break;
