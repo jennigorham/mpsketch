@@ -165,6 +165,10 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 		case GDK_KEY_period:
 			path_mode_change(false);
 			break;
+		case GDK_KEY_c:
+			if (!finished_drawing) end_path();
+			mode=CIRCLE_MODE;
+			break;
 		case GDK_KEY_y:
 			output_path();
 			break;
