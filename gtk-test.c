@@ -38,6 +38,12 @@ void draw_circle(double centre_x, double centre_y, int r) {
 	cairo_arc(cr, mp_x_coord_to_pxl(centre_x), mp_y_coord_to_pxl(centre_y), r, 0, 2*M_PI);
 }
 
+void fill_circle(double centre_x, double centre_y, int r) {
+	cairo_new_sub_path(cr);
+	cairo_arc(cr, mp_x_coord_to_pxl(centre_x), mp_y_coord_to_pxl(centre_y), r, 0, 2*M_PI);
+	cairo_fill(cr);
+}
+
 void draw_bezier(double start_x, double start_y, double start_right_x, double start_right_y, double end_left_x, double end_left_y, double end_x, double end_y) {
 	cairo_new_sub_path(cr);
 	cairo_move_to(cr,
@@ -90,9 +96,8 @@ static gboolean on_draw_event(GtkWidget *widget, cairo_t *this_cr, gpointer user
 	cairo_set_source_rgb(cr, 0, 0, 0);
 	cairo_set_line_width(cr, 0.5);
 
-	//filled circle
-	//cairo_arc(cr, 10, 10, 3, 0, 2*M_PI);
-	//cairo_fill(cr);
+	if (edit)
+		fill_circle(cur_path->points[edit_point].x,cur_path->points[edit_point].y,POINT_RADIUS);
 
 	draw_path();
 	cairo_stroke(cr);
