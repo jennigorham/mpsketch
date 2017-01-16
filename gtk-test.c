@@ -165,7 +165,7 @@ static gboolean on_motion(GtkWidget *widget, GdkEventMotion *event, gpointer use
 	GdkModifierType state;
 	GdkDevice *device=gdk_event_get_source_device((GdkEvent *)event);
 	gdk_window_get_device_position(event->window,device,&x,&y,&state);
-	printf("(%d,%d)\n",x,y);
+	pointer_move(x,y);
 	return FALSE;
 }
 
