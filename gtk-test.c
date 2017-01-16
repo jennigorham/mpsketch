@@ -157,6 +157,10 @@ static gboolean resize(GtkWidget *widget, GdkEventKey *event, gpointer user_data
 	return FALSE;
 }
 
+void copy_to_clipboard(char *s) {
+	gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD), s, -1);
+}
+
 static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
 	///usr/include/gtk-3.0/gdk/gdkkeysyms.h
 	switch(event->keyval) {
@@ -179,7 +183,7 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 			gtk_widget_queue_draw(widget);
 			break;
 		case GDK_KEY_y:
-			gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD), "test", -1);
+			output_path();
 			break;
 		case GDK_KEY_p: ;
 			gchar *text = gtk_clipboard_wait_for_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));

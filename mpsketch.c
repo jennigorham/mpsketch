@@ -459,16 +459,6 @@ void move_point() {
 	}
 }
 
-void output_path() {
-	char *s = path_to_string();
-	copy_to_clipboard(s);
-	if (cur_path->n > 1 || cur_path->n == -1)
-		printf("draw %s;\n",s);
-	else if (cur_path->n == 1)
-		printf("drawdot %s;\n",s);
-	free(s);
-}
-
 void button_release(short x, short y,int button) {
 	if (button == 1) {
 		if (mode == CIRCLE_MODE) {

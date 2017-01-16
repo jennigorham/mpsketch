@@ -39,8 +39,10 @@ bool edit;
 int edit_point; //which point are we editing
 
 void draw_path(); //draw the current path or circle
+void output_path();
 
 //defined in mpsketch.c or gtk-test.c
 void draw_circle(double centre_x, double centre_y, int r);
 void link_point_pair(struct point *p, struct point *q); //draw either a straight line or a bezier curve linking two consecutive points on a path
+void copy_to_clipboard(char *s);
 #endif

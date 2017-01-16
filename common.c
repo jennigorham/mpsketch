@@ -45,3 +45,12 @@ double pxl_to_mp_x_coord(int x) {
 double pxl_to_mp_y_coord(int y) {
 	return ((-y_offset + win_height-((float) y))*INCH/density + ll_y);
 }
+
+void output_path() {
+	char *s = path_to_string();
+	copy_to_clipboard(s);
+	if (cur_path->n > 1 || cur_path->n == -1)
+		printf("draw %s;\n",s);
+	else if (cur_path->n == 1)
+		printf("drawdot %s;\n",s);
+}
