@@ -135,7 +135,7 @@ static gboolean button_release(GtkWidget *widget, GdkEventButton *event, gpointe
 					false
 				);
 			}
-			gtk_widget_queue_draw(widget);
+			redraw_screen();
 			//point under cursor
 			append_point(
 				pxl_to_mp_x_coord(event->x),
@@ -147,13 +147,17 @@ static gboolean button_release(GtkWidget *widget, GdkEventButton *event, gpointe
 	return FALSE;
 }
 
+void redraw_screen() {
+	gtk_widget_queue_draw(widget);
+}
+
 static gboolean resize(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
 	gint width,height;
 	gtk_window_get_size(GTK_WINDOW(widget), &width, &height);
 	win_width = (unsigned int) width;
 	win_height = (unsigned int) height;
 	//printf("Resize: %d,%d\n",win_width,win_height);
-	gtk_widget_queue_draw(widget);
+	redraw_screen();
 	return FALSE;
 }
 
@@ -174,13 +178,13 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 			mode=STRAIGHT_MODE;
 			if (!finished_drawing) set_straight(cur_path->n-2,true);
 			else if (edit) set_straight(edit_point,true);
-			gtk_widget_queue_draw(widget);
+			redraw_screen();
 			break;
 		case GDK_KEY_period:
 			mode=CURVE_MODE;
 			if (!finished_drawing) set_straight(cur_path->n-2,false);
 			else if (edit) set_straight(edit_point,false);
-			gtk_widget_queue_draw(widget);
+			redraw_screen();
 			break;
 		case GDK_KEY_y:
 			output_path();
@@ -189,7 +193,8 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 			gchar *text = gtk_clipboard_wait_for_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
 			if (text != NULL) {
 				string_to_path(text);
-				gtk_widget_queue_draw(widget);
+				finished_drawing = true;
+				redraw_screen();
 			}
 			break;
 		default:

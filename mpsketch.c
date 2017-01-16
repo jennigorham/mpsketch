@@ -67,7 +67,6 @@ void move_point(); //when you click and drag a point on a path/circle
 void show_help(); //display message about usage
 void show_msg(int pos,char *msg); //display message
 
-void redraw_screen(); //draw bitmap on screen, then draw the path
 double bezier(double start, double start_right, double end_left, double end, double t);
 void draw_bezier(double start_x, double start_y, double start_right_x, double start_right_y, double end_left_x, double end_left_y, double end_x, double end_y); //draw the cubic bezier curve connecting two points
 

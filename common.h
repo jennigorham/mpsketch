@@ -45,4 +45,5 @@ void output_path();
 void draw_circle(double centre_x, double centre_y, int r);
 void link_point_pair(struct point *p, struct point *q); //draw either a straight line or a bezier curve linking two consecutive points on a path
 void copy_to_clipboard(char *s);
+void redraw_screen();
 #endif
