@@ -105,13 +105,14 @@ static gboolean on_draw_event(GtkWidget *widget, cairo_t *this_cr, gpointer user
 	return FALSE;
 }
 
-static gboolean clicked(GtkWidget *widget, GdkEventButton *event, gpointer user_data) {
-	printf("Button %d, (%f,%f)\n",event->button,event->x,event->y);
+static gboolean button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data) {
+	if (event->button == 1 && edit) dragging_point = true;
+	//printf("Button %d, (%f,%f)\n",event->button,event->x,event->y);
 	return FALSE;
 }
 
 static gboolean button_release(GtkWidget *widget, GdkEventButton *event, gpointer user_data) {
-	if (event->button == 1 && !edit) 
+	if (event->button == 1) 
 		click_point(event->x,event->y);
 	return FALSE;
 }
@@ -136,52 +137,54 @@ void copy_to_clipboard(char *s) {
 
 static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
 	///usr/include/gtk-3.0/gdk/gdkkeysyms.h
-	switch(event->keyval) {
-		case GDK_KEY_Escape:
-			if (finished_drawing) { //clear
-				cur_path->n = 0;
-				redraw_screen();
-			} else
-				end_path();
-			break;
-		case GDK_KEY_Return:
-			if (!finished_drawing) {
-				cur_path->cycle = true;
-				end_path();
-			} else if (edit) {
-				cur_path->cycle = !cur_path->cycle;
-				redraw_screen();
-			}
-			break;
-		case GDK_KEY_e:
-			show_error(GTK_WINDOW(widget));
-			break;
-		case GDK_KEY_q:
-			gtk_widget_destroy(widget);
-			break;
-		case GDK_KEY_minus:
-			path_mode_change(true);
-			break;
-		case GDK_KEY_period:
-			path_mode_change(false);
-			break;
-		case GDK_KEY_c:
-			if (!finished_drawing) end_path();
-			mode=CIRCLE_MODE;
-			break;
-		case GDK_KEY_y:
-			output_path();
-			break;
-		case GDK_KEY_p: ;
-			gchar *text = gtk_clipboard_wait_for_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
-			if (text != NULL) {
-				string_to_path(text);
-				finished_drawing = true;
-				redraw_screen();
-			}
-			break;
-		default:
-			printf("%d\n",event->keyval);
+	if (!dragging_point) {
+		switch(event->keyval) {
+			case GDK_KEY_Escape:
+				if (finished_drawing) { //clear
+					cur_path->n = 0;
+					redraw_screen();
+				} else
+					end_path();
+				break;
+			case GDK_KEY_Return:
+				if (!finished_drawing) {
+					cur_path->cycle = true;
+					end_path();
+				} else if (edit) {
+					cur_path->cycle = !cur_path->cycle;
+					redraw_screen();
+				}
+				break;
+			case GDK_KEY_e:
+				show_error(GTK_WINDOW(widget));
+				break;
+			case GDK_KEY_q:
+				gtk_widget_destroy(widget);
+				break;
+			case GDK_KEY_minus:
+				path_mode_change(true);
+				break;
+			case GDK_KEY_period:
+				path_mode_change(false);
+				break;
+			case GDK_KEY_c:
+				if (!finished_drawing) end_path();
+				mode=CIRCLE_MODE;
+				break;
+			case GDK_KEY_y:
+				output_path();
+				break;
+			case GDK_KEY_p: ;
+				gchar *text = gtk_clipboard_wait_for_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
+				if (text != NULL) {
+					string_to_path(text);
+					finished_drawing = true;
+					redraw_screen();
+				}
+				break;
+			default:
+				printf("%d\n",event->keyval);
+		}
 	}
 	return FALSE;
 }
@@ -231,7 +234,7 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	gtk_widget_add_events(window, GDK_POINTER_MOTION_MASK);
 	gtk_widget_add_events(window, GDK_BUTTON_RELEASE_MASK);
 	gtk_widget_add_events(window, GDK_SCROLL_MASK);
-	g_signal_connect(window, "button-press-event", G_CALLBACK(clicked), NULL);
+	g_signal_connect(window, "button-press-event", G_CALLBACK(button_press), NULL);
 	g_signal_connect(window, "button-release-event", G_CALLBACK(button_release), NULL);
 	g_signal_connect(window, "key-press-event", G_CALLBACK (key_press), NULL);
 	g_signal_connect(window, "motion-notify-event", G_CALLBACK (on_motion), NULL);

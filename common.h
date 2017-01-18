@@ -37,6 +37,7 @@ double pxl_to_mp_y_coord(int y);
 //when we mouse over a point in a completed path, we can edit it
 bool edit;
 int edit_point; //which point are we editing
+bool dragging_point;
 
 void draw_path(); //draw the current path or circle
 void output_path(); //print path to clipboard and stdout

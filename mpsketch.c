@@ -247,7 +247,7 @@ int main(int argc, char **argv) {
 			redraw_screen();
 			break;
 		case ButtonPress:
-			if (edit) move_point();
+			if (edit) dragging_point=true;
 			break;
 		case ButtonRelease:
 			button_release(e.xbutton.x,e.xbutton.y,e.xbutton.button);
@@ -256,7 +256,7 @@ int main(int argc, char **argv) {
 			if (!help) pointer_move((int) e.xmotion.x,(int) e.xmotion.y);
 			break;
 		case KeyPress:
-			keypress(e.xkey.keycode,e.xkey.state);
+			if (!dragging_point) keypress(e.xkey.keycode,e.xkey.state);
 			break;
 		case ClientMessage:
 			if ((Atom)e.xclient.data.l[0] == wm_delete_window)
@@ -428,6 +428,8 @@ void keypress(int keycode,int state) {
 	}
 }
 
+/*
+//Old version of what happens when the user clicks and drags a point on a path. Use dragging_point variable instead now because it works across xlib, gtk, etc
 void move_point() {
 	XEvent e;
 	XNextEvent(d, &e);
@@ -442,7 +444,7 @@ void move_point() {
 		}
 		XNextEvent(d, &e);
 	}
-}
+}*/
 
 void button_release(short x, short y, int button) {
 	if (button == 1) {

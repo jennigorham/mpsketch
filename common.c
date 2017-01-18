@@ -56,7 +56,15 @@ void output_path() {
 }
 
 void click_point(int x, int y) {
-	if (mode == CIRCLE_MODE) {
+	if (dragging_point) {
+		dragging_point = false;
+		set_coords(
+			edit_point,
+			pxl_to_mp_x_coord(x),
+			pxl_to_mp_y_coord(y)
+		);
+		redraw_screen();
+	} else if (mode == CIRCLE_MODE) {
 		if (finished_drawing) { //start a new circle
 			cur_path->n = 0;
 			set_coords(0,pxl_to_mp_x_coord(x),pxl_to_mp_y_coord(y));
@@ -123,6 +131,13 @@ void pointer_move(int x,int y) {
 			set_coords(1,pxl_to_mp_x_coord(x),pxl_to_mp_y_coord(y));
 		else
 			set_coords(cur_path->n-1,pxl_to_mp_x_coord(x),pxl_to_mp_y_coord(y));
+		redraw_screen();
+	} else if (dragging_point) {
+		set_coords(
+			edit_point,
+			pxl_to_mp_x_coord(x),
+			pxl_to_mp_y_coord(y)
+		);
 		redraw_screen();
 	} else {
 		//if the user mouses over a point on the path, they can edit it (drag it, change the section after it to straight/curved)
