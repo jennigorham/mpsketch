@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <math.h>
+#include <sys/types.h> //for getpid
 
 #include "paths.h"
 #include "mptoraster.h"
@@ -15,7 +16,6 @@
 
 #define _NET_WM_STATE_ADD 1
 #define SUBINTERVALS 20 //how many straight sections to make up the bezier curve connecting two points
-#define TMP_JOB_NAME "tmp-mpsketch"
 
 /*
 TODO: 
@@ -103,9 +103,20 @@ void box_msg(char *msg) {
 	XSetForeground(d,gc,BlackPixel(d, s));
 	XDrawRectangle(d,w,gc,x,y,box_width,box_height);
 	XDrawString(d, w, gc, x+10, win_height/2, msg, strlen(msg));
+	XFlush(d);
 }
 void error() {
 	box_msg("Error. See stdout for details.");
+}
+
+void zoom() { //remake the bitmap after density change
+	char filename[strlen(tmp_job_name) + 5];
+	sprintf(filename,"%s.xbm",tmp_job_name);
+
+	if (make_bitmap(tmp_job_name) == 0 && get_bitmap(filename,d,w,&bitmap,&bitmap_width,&bitmap_height) == 0) {
+		remove(filename);
+		redraw_screen();
+	} else error();
 }
 
 //Find X(t) or Y(t) given coords of two points on curve and control points between them
@@ -201,6 +212,9 @@ int main(int argc, char **argv) {
 	mode = CURVE_MODE;
 	edit=false;
 
+	pid_t pid = getpid();
+	snprintf(tmp_job_name,sizeof tmp_job_name,"mpsketch-tmp-%d",pid);
+
 	win_width = 400;
 	win_height = 400;
 	
@@ -233,6 +247,8 @@ int main(int argc, char **argv) {
 	if (show_trace)
 		get_trace(trace_filename);
 
+	show_help();
+	XFlush(d);
 	refresh();
 
 	while (!quit) {
@@ -266,7 +282,9 @@ int main(int argc, char **argv) {
 	free(cur_path);
 
 	//Probably shouldn't do this, but it's the easiest way for now
-	system("rm " TMP_JOB_NAME ".*");
+	char cmd[6 + strlen(tmp_job_name)];
+	sprintf(cmd,"rm %s.*",tmp_job_name);
+	system(cmd);
 
 	XCloseDisplay(d);
 	return 0;
@@ -387,10 +405,7 @@ void keypress(int keycode,int state) {
 	case 61://z - zoom
 		if (state & ShiftMask) density/=2; //shift-z zooms out
 		else density*=2;
-		if (make_bitmap(job_name,TMP_JOB_NAME ".xbm") == 0 && get_bitmap(TMP_JOB_NAME ".xbm",d,w,&bitmap,&bitmap_width,&bitmap_height) == 0) {
-			remove(TMP_JOB_NAME ".xbm");
-			redraw_screen();
-		} else error();
+		zoom();
 		break;
 	case 28://y - yank path string
 		output_path();
@@ -485,20 +500,20 @@ void refresh() {
 	} else {
 		get_coords(job_name);
 	}*/
-	box_msg("Running metapost...");
-	XFlush(d); //Xlib won't update the screen while metapost runs unless we do this
+	if (!help) box_msg("Running metapost...");
 
-	int ret = create_mp_file(job_name,TMP_JOB_NAME);
+	int ret = create_mp_file(job_name,tmp_job_name);
 	if (ret != 0) {
 		error();
 		if (ret == 1) printf("Couldn't open %s.mp\n",job_name);
-		else if (ret == 2) printf("Couldn't open %s.mp for writing\n",TMP_JOB_NAME);
-	} else if (run_mpost(TMP_JOB_NAME) != 0 || get_coords(TMP_JOB_NAME) != 0) {
+		else if (ret == 2) printf("Couldn't open %s.mp for writing\n",tmp_job_name);
+	} else if (run_mpost(tmp_job_name) != 0 || get_coords(tmp_job_name) != 0) {
 		error();
 	} else {
-		box_msg("Creating raster image...");
-		XFlush(d);
-		if (make_bitmap(TMP_JOB_NAME,TMP_JOB_NAME ".xbm") != 0 || get_bitmap(TMP_JOB_NAME ".xbm",d,w,&bitmap,&bitmap_width,&bitmap_height) != 0) {
+		if (!help) box_msg("Creating raster image...");
+		char filename[strlen(tmp_job_name) + 5];
+		sprintf(filename,"%s.xbm",tmp_job_name);
+		if (make_bitmap(tmp_job_name) != 0 || get_bitmap(filename,d,w,&bitmap,&bitmap_width,&bitmap_height) != 0) {
 			error();
 		} else {
 			redraw_screen();

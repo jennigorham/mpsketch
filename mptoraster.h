@@ -18,15 +18,15 @@ unsigned int fig_num; //metapost figure number (the "1" in "beginfig(1)" for exa
 
 int density; //points per inch for bitmap. changes when we zoom in
 
-//run metapost to create ps/pdf file
-int run_mpost(char *job_name);
-//get the coordinates of the lower left corner of the image, which are written in the logfile
-int get_coords(char *job_name);
-//convert the ps/pdf to a raster image
-int make_bitmap(char *job_name, char *filename);
-//read in the raster
-int get_bitmap(char *filename, Display *d, Window w, Pixmap *bitmap, unsigned int *bitmap_width, unsigned int *bitmap_height);
 //create a new mp file from the original, with commands added to save the coords and override outputtemplate and prologues
 int create_mp_file(char *job_name_in, char *job_name_out);
+//run metapost to create ps/pdf file
+int run_mpost(char *job_name);
+//get the coordinates of the lower left corner of the image, which are written in job_name.log
+int get_coords(char *job_name);
+//convert the ps/pdf to a raster image, creates job_name.xbm
+int make_bitmap(char *job_name);
+//read in the raster
+int get_bitmap(char *filename, Display *d, Window w, Pixmap *bitmap, unsigned int *bitmap_width, unsigned int *bitmap_height);
 
 #endif

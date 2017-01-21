@@ -137,19 +137,19 @@ int get_coords(char *job_name) {
 	}*/
 }
 
-int make_bitmap(char *job_name, char *filename) {
+int make_bitmap(char *job_name) {
 	//TODO: if ps/pdf file not found, show message about leaving outputtemplate as default
 	char cmd[
-		strlen("convert -density  -.pdf ") +
+		strlen("convert -density  -.pdf .xbm") +
 		(int) floor(log10(density)) + 1 + //chars in density
-		strlen(job_name) +
+		strlen(job_name)*2 +
 		(int) floor(log10(fig_num)) + 1 + //chars in fig_num
-		strlen(filename) + 1
+		1
 	];
 	if (USE_MPTOPDF)
-		sprintf(cmd,"convert -density %d %s-%d.pdf %s",density,job_name,fig_num,filename);
+		sprintf(cmd,"convert -density %d %s-%d.pdf %s.xbm",density,job_name,fig_num,job_name);
 	else
-		sprintf(cmd,"convert -density %d %s.%d %s",density,job_name,fig_num,filename);
+		sprintf(cmd,"convert -density %d %s.%d %s.xbm",density,job_name,fig_num,job_name);
 	printf("\nRunning \"%s\"...\n\n",cmd);
 	int ret = system(cmd);
 	if (ret != 0) {

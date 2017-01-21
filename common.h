@@ -18,6 +18,7 @@
 #define CIRCLE_MODE 3
 
 char *job_name; //The part of the metapost filename before ".mp"
+char tmp_job_name[100];
 
 int trace_x_offset,trace_y_offset;
 bool show_trace;
