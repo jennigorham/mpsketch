@@ -26,7 +26,7 @@ int run_mpost(char *job_name);
 int get_coords(char *job_name);
 //convert the ps/pdf to a raster image, creates job_name.xbm
 int make_bitmap(char *job_name);
-//read in the raster
-int get_bitmap(char *filename, Display *d, Window w, Pixmap *bitmap, unsigned int *bitmap_width, unsigned int *bitmap_height);
+//convert the ps/pdf to a raster image, creates job_name.png
+int make_png(char *job_name);
 
 #endif

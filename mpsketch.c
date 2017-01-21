@@ -2,16 +2,8 @@
 #include <ctype.h>
 #include <time.h>
 #include <sys/stat.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
-#include <unistd.h>
-#include <math.h>
-#include <sys/types.h> //for getpid
 
-#include "paths.h"
-#include "mptoraster.h"
 #include "common.h"
 
 #define _NET_WM_STATE_ADD 1
@@ -20,6 +12,7 @@
 /*
 TODO: 
 port to gtk+
+asprintf in make_png, make_bitmap etc
 string_to_path for circles
 take jobname.mp as first arg, rather than jobname
 do spaces in jobname stuff up the xbm?
@@ -107,6 +100,29 @@ void box_msg(char *msg) {
 }
 void error() {
 	box_msg("Error. See stdout for details.");
+}
+
+int get_bitmap(char *filename, Display *d, Window w, Pixmap *bitmap, unsigned int *bitmap_width, unsigned int *bitmap_height) {
+	int hotspot_x, hotspot_y;
+	int ret = XReadBitmapFile(d, w,
+							 filename,
+							 bitmap_width, bitmap_height,
+							 bitmap,
+							 &hotspot_x, &hotspot_y);
+	if (ret != BitmapSuccess) {
+		switch (ret) {
+			case BitmapOpenFailed:
+				fprintf(stderr, "XReadBitmapFile - could not open file '%s'.\n",filename);
+				break;
+			case BitmapFileInvalid:
+				fprintf(stderr, "XReadBitmapFile - file '%s' doesn't contain a valid bitmap.\n", filename);
+				break;
+			case BitmapNoMemory:
+				fprintf(stderr, "XReadBitmapFile - not enough memory.\n");
+				break;
+		}
+	}
+	return ret;
 }
 
 void zoom() { //remake the bitmap after density change
@@ -207,21 +223,12 @@ int main(int argc, char **argv) {
 	} else fig_num = 1;
 	//TODO: create job_name.mp if it doesn't exist
 
-	density = 100;
-	finished_drawing=true;
-	mode = CURVE_MODE;
-	edit=false;
-
-	pid_t pid = getpid();
-	snprintf(tmp_job_name,sizeof tmp_job_name,"mpsketch-tmp-%d",pid);
+	initialise();
 
 	win_width = 400;
 	win_height = 400;
 	
 	XEvent e;
-
-	cur_path = malloc(sizeof(struct path));
-	init_path(cur_path);
 	
 	d = XOpenDisplay(NULL);
 	if (d == NULL) {
@@ -279,12 +286,8 @@ int main(int argc, char **argv) {
 			break;
 		}
 	}
-	free(cur_path);
 
-	//Probably shouldn't do this, but it's the easiest way for now
-	char cmd[6 + strlen(tmp_job_name)];
-	sprintf(cmd,"rm %s.*",tmp_job_name);
-	system(cmd);
+	cleanup();
 
 	XCloseDisplay(d);
 	return 0;

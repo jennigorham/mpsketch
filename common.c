@@ -156,3 +156,24 @@ void pointer_move(int x,int y) {
 		redraw_screen();
 	}
 }
+
+void initialise() {
+	density = 100;
+	finished_drawing=true;
+	mode = CURVE_MODE;
+	edit=false;
+
+	pid_t pid = getpid();
+	snprintf(tmp_job_name,sizeof tmp_job_name,"mpsketch-tmp-%d",pid);
+
+	cur_path = malloc(sizeof(struct path));
+	init_path(cur_path);
+}
+void cleanup() {
+	free(cur_path);
+
+	//Probably shouldn't do this, but it's the easiest way for now
+	char cmd[6 + strlen(tmp_job_name)];
+	sprintf(cmd,"rm %s.*",tmp_job_name);
+	system(cmd);
+}

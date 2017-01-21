@@ -138,7 +138,6 @@ int get_coords(char *job_name) {
 }
 
 int make_bitmap(char *job_name) {
-	//TODO: if ps/pdf file not found, show message about leaving outputtemplate as default
 	char cmd[
 		strlen("convert -density  -.pdf .xbm") +
 		(int) floor(log10(density)) + 1 + //chars in density
@@ -153,7 +152,7 @@ int make_bitmap(char *job_name) {
 	printf("\nRunning \"%s\"...\n\n",cmd);
 	int ret = system(cmd);
 	if (ret != 0) {
-		printf("%d\n",ret);
+		//printf("%d\n",ret);
 		fprintf(stderr,"ERROR: couldn't create bitmap.");
 		puts("Ensure that imagemagick is installed.");
 		//now that mpsketch-coords.mp overrides prologues and outputtemplate, we don't need the following:
@@ -172,25 +171,24 @@ int make_bitmap(char *job_name) {
 	return ret;
 }
 
-int get_bitmap(char *filename, Display *d, Window w, Pixmap *bitmap, unsigned int *bitmap_width, unsigned int *bitmap_height) {
-	int hotspot_x, hotspot_y;
-	int ret = XReadBitmapFile(d, w,
-							 filename,
-							 bitmap_width, bitmap_height,
-							 bitmap,
-							 &hotspot_x, &hotspot_y);
-	if (ret != BitmapSuccess) {
-		switch (ret) {
-			case BitmapOpenFailed:
-				fprintf(stderr, "XReadBitmapFile - could not open file '%s'.\n",filename);
-				break;
-			case BitmapFileInvalid:
-				fprintf(stderr, "XReadBitmapFile - file '%s' doesn't contain a valid bitmap.\n", filename);
-				break;
-			case BitmapNoMemory:
-				fprintf(stderr, "XReadBitmapFile - not enough memory.\n");
-				break;
-		}
+int make_png(char *job_name) {
+	char cmd[
+		strlen("convert -density  -.pdf .png") +
+		(int) floor(log10(density)) + 1 + //chars in density
+		strlen(job_name)*2 +
+		(int) floor(log10(fig_num)) + 1 + //chars in fig_num
+		1
+	];
+	if (USE_MPTOPDF)
+		sprintf(cmd,"convert -density %d %s-%d.pdf %s.png",density,job_name,fig_num,job_name);
+	else
+		sprintf(cmd,"convert -density %d %s.%d %s.png",density,job_name,fig_num,job_name);
+	printf("\nRunning \"%s\"...\n\n",cmd);
+	int ret = system(cmd);
+	if (ret != 0) {
+		//printf("%d\n",ret);
+		fprintf(stderr,"ERROR: couldn't create png file.");
+		puts("Ensure that imagemagick is installed.");
 	}
 	return ret;
 }

@@ -1,11 +1,6 @@
 #include <gtk/gtk.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <gdk/gdkkeysyms.h>
-#include <math.h>
 
-#include "paths.h"
-#include "mptoraster.h"
 #include "common.h"
 
 /*
@@ -21,6 +16,22 @@ cairo_surface_t *trace;
 cairo_t *cr;
 
 GtkWidget *darea;
+
+//rerun metapost, convert to png
+void refresh() {
+	int ret = create_mp_file(job_name,tmp_job_name);
+	if (ret == 1) printf("Couldn't open %s.mp\n",job_name);
+	else if (ret == 2) printf("Couldn't open %s.mp for writing\n",tmp_job_name);
+	else if (run_mpost(tmp_job_name) != 0 || get_coords(tmp_job_name) != 0) {
+		//TODO: error on screen
+	} else if (make_png(tmp_job_name) != 0) {
+		//TODO: error on screen
+	} else {
+		char png[strlen(tmp_job_name)+5];
+		sprintf(png,"%s.png",tmp_job_name);
+		mp_png = cairo_image_surface_create_from_png(png);
+	}
+}
 
 void show_error(gpointer window) {//http://zetcode.com/gui/gtk2/gtkdialogs/
 	GtkWidget *dialog;
@@ -159,6 +170,10 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 			case GDK_KEY_e:
 				show_error(GTK_WINDOW(widget));
 				break;
+			case GDK_KEY_r:
+				refresh();
+				redraw_screen();
+				break;
 			case GDK_KEY_q:
 				gtk_widget_destroy(widget);
 				break;
@@ -223,10 +238,11 @@ static gboolean on_scroll(GtkWidget* widget, GdkEventScroll* event, gpointer use
 static void activate (GtkApplication* app, gpointer user_data) {
 	GtkWidget *window;
 
-	cur_path = malloc(sizeof(struct path));
-	init_path(cur_path);
+	initialise();
 
-	mp_png = cairo_image_surface_create_from_png("test.png");
+	if (job_name == NULL) job_name = "test";
+	refresh();
+	//mp_png = cairo_image_surface_create_from_png("test.png");
 
 	window = gtk_application_window_new (app);
 	gtk_window_set_title (GTK_WINDOW (window), "MPSketch");
@@ -246,8 +262,6 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	gtk_container_add(GTK_CONTAINER(window), darea);
 
 	g_signal_connect(G_OBJECT(darea), "draw", G_CALLBACK(on_draw_event), NULL);
-	printf("Figure number: %d\n",fig_num);
-	printf("Unit name: %s\n",unit_name);
 
 	gtk_widget_show_all (window);
 }
@@ -302,11 +316,7 @@ int main (int argc, char **argv) {
 	coord_precision = 0;
 	unit_name = "";
 	fig_num = 1;
-	mode = CURVE_MODE;
-	density = 100;
-	finished_drawing=true;
 	show_trace = false;
-	edit=false;
 
 	//Coding these in for now until I set up mptoraster
 	ll_x = -359.35;
@@ -333,6 +343,9 @@ int main (int argc, char **argv) {
 
 	cairo_surface_destroy(mp_png);
 	cairo_surface_destroy(trace);
+
+	cleanup();
+
 	return status;
 }
 
