@@ -1,7 +1,7 @@
 #include "mptoraster.h"
 
 //run metapost on the file, generating a ps or pdf output
-int run_mpost() {
+int run_mpost(char *job_name) {
 	char cmd[strlen(job_name) + strlen("mpost --interaction=nonstopmode .mp") + 1];
 	if (USE_MPTOPDF)
 		sprintf(cmd,"mptopdf %s.mp",job_name);
@@ -12,7 +12,39 @@ int run_mpost() {
 	return system(cmd);
 }
 
-int get_coords() {
+int create_mp_file(char *job_name_in, char *job_name_out) {
+	char filename_in[strlen(job_name_in)+4];
+	char filename_out[strlen(job_name_out)+4];
+	sprintf(filename_in,"%s.mp",job_name_in);
+	sprintf(filename_out,"%s.mp",job_name_out);
+
+	FILE *file_in = fopen(filename_in,"r");
+	if (file_in == NULL) return 1;
+	FILE *file_out = fopen(filename_out,"w");
+	if (file_out == NULL) return 2;
+
+	//tell metapost to show the coords in the log
+	fputs("def save_coords = ",file_out);
+	fputs("show \"Figure \" & decimal(charcode) & \" x-coordinate: \" & decimal((xpart llcorner bbox currentpicture) + bboxmargin);",file_out);
+	fputs("show \"Figure \" & decimal(charcode) & \" y-coordinate: \" & decimal((ypart llcorner bbox currentpicture) + bboxmargin);",file_out);
+	//override prologues and outputtemplate
+	fputs("prologues:=3;",file_out);
+	fputs("outputtemplate:=\"%j.%c\";",file_out);
+	fputs("enddef;",file_out);
+	//code will be run after every figure
+	fputs("extra_endfig := extra_endfig & \"save_coords;\";\n\n",file_out);
+
+	//tack on the original mp file
+	char ch;
+	while( ( ch = fgetc(file_in) ) != EOF ) 
+		fputc(ch,file_out);
+	
+	fclose(file_out);
+	fclose(file_in);
+	return 0;
+}
+
+int get_coords(char *job_name) {
 	//Get the metapost coordinates of the lower left corner of the image
 	//There are three ways I can think of doing this.
 	//Method 1: use "show ..." in the metapost to write the coords to stdout then read them in with popen
@@ -105,7 +137,7 @@ int get_coords() {
 	}*/
 }
 
-int make_bitmap(char *filename) {
+int make_bitmap(char *job_name, char *filename) {
 	//TODO: if ps/pdf file not found, show message about leaving outputtemplate as default
 	char cmd[
 		strlen("convert -density  -.pdf ") +
@@ -134,7 +166,7 @@ int make_bitmap(char *filename) {
 		Can't find (or can't open) font file CMR10.
 		Querying operating system for font files..."
 		This seems to be a problem with ghostscript 9.10: https://bugs.ghostscript.com/show_bug.cgi?id=695787
-		Can be fixed by running system("GS_OPTIONS=-dNONATIVEFONTMAP convert ... but it doesn't matter now because I've put prologues:=3 in the save_coords macro in mpsketch-coords.mp so if the user sets prologues:=1 it'll be overridden
+		Can be fixed by running system("GS_OPTIONS=-dNONATIVEFONTMAP convert ... but it doesn't matter now because I've put prologues:=3 in the save_coords macro so if the user sets prologues:=1 it'll be overridden
 		*/
 	}
 	return ret;

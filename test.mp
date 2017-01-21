@@ -1,4 +1,4 @@
-input mpsketch-coords;
+%input mpsketch-coords;
 outputtemplate := "%j.%3c";
 prologues:=2;
 

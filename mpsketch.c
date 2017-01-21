@@ -15,7 +15,7 @@
 
 #define _NET_WM_STATE_ADD 1
 #define SUBINTERVALS 20 //how many straight sections to make up the bezier curve connecting two points
-#define XBM_FILENAME "mp-drawing.xbm"
+#define TMP_JOB_NAME "tmp-mpsketch"
 
 /*
 TODO: 
@@ -23,7 +23,6 @@ port to gtk+
 string_to_path for circles
 take jobname.mp as first arg, rather than jobname
 do spaces in jobname stuff up the xbm?
-could create a new mp file by concatenating the save_coords macro and the source mp file then delete it (and the ps and log files) afterwards. that way the user wouldn't need to "input mpsketch-coords;"
 include instructions on how to get mplib in README
 	also link to mpman: https://www.tug.org/docs/metapost/mpman.pdf
 if pushing a path outside current view, scroll to it
@@ -266,6 +265,9 @@ int main(int argc, char **argv) {
 	}
 	free(cur_path);
 
+	//Probably shouldn't do this, but it's the easiest way for now
+	system("rm " TMP_JOB_NAME ".*");
+
 	XCloseDisplay(d);
 	return 0;
 }
@@ -385,8 +387,8 @@ void keypress(int keycode,int state) {
 	case 61://z - zoom
 		if (state & ShiftMask) density/=2; //shift-z zooms out
 		else density*=2;
-		if (make_bitmap(XBM_FILENAME) == 0 && get_bitmap(XBM_FILENAME,d,w,&bitmap,&bitmap_width,&bitmap_height) == 0) {
-			remove(XBM_FILENAME);
+		if (make_bitmap(job_name,TMP_JOB_NAME ".xbm") == 0 && get_bitmap(TMP_JOB_NAME ".xbm",d,w,&bitmap,&bitmap_width,&bitmap_height) == 0) {
+			remove(TMP_JOB_NAME ".xbm");
 			redraw_screen();
 		} else error();
 		break;
@@ -479,21 +481,26 @@ void refresh() {
 	stat(pic_filename, &pic_attrib);
 	stat(mp_filename, &mp_attrib);
 	if (difftime(mp_attrib.st_ctime, pic_attrib.st_ctime) > 0) {
-		run_mpost();
+		run_mpost(job_name);
 	} else {
-		get_coords();
+		get_coords(job_name);
 	}*/
 	box_msg("Running metapost...");
 	XFlush(d); //Xlib won't update the screen while metapost runs unless we do this
-	if (run_mpost() != 0 || get_coords() != 0) {
+
+	int ret = create_mp_file(job_name,TMP_JOB_NAME);
+	if (ret != 0) {
+		error();
+		if (ret == 1) printf("Couldn't open %s.mp\n",job_name);
+		else if (ret == 2) printf("Couldn't open %s.mp for writing\n",TMP_JOB_NAME);
+	} else if (run_mpost(TMP_JOB_NAME) != 0 || get_coords(TMP_JOB_NAME) != 0) {
 		error();
 	} else {
 		box_msg("Creating raster image...");
 		XFlush(d);
-		if (make_bitmap(XBM_FILENAME) != 0 || get_bitmap(XBM_FILENAME,d,w,&bitmap,&bitmap_width,&bitmap_height) != 0) {
+		if (make_bitmap(TMP_JOB_NAME,TMP_JOB_NAME ".xbm") != 0 || get_bitmap(TMP_JOB_NAME ".xbm",d,w,&bitmap,&bitmap_width,&bitmap_height) != 0) {
 			error();
 		} else {
-			remove(XBM_FILENAME);
 			redraw_screen();
 		}
 	}

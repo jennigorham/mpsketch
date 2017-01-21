@@ -17,6 +17,8 @@
 #define CORNER_MODE 2
 #define CIRCLE_MODE 3
 
+char *job_name; //The part of the metapost filename before ".mp"
+
 int trace_x_offset,trace_y_offset;
 bool show_trace;
 
