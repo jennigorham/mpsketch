@@ -41,8 +41,15 @@ void refresh(gpointer window) {
 		show_error(window,"Couldn't open %s.mp",job_name);
 	else if (ret == 2)
 		show_error(window,"Couldn't open %s.mp for writing",tmp_job_name);
-	else if (run_mpost(tmp_job_name) != 0 || get_coords(tmp_job_name) != 0) {
+	else if (run_mpost(tmp_job_name) != 0) {
 		show_error(window,"%s","Error running metapost. See stdout for more details.");
+	} else if ((ret = get_coords(tmp_job_name)) != 0) {
+		if (ret == 1) show_error(window,"Couldn't open %s.log.",tmp_job_name);
+		else if (ret == 2) {
+			char s[10];
+			snprintf(s,sizeof s,"%d",fig_num);
+			show_error(window,"Couldn't find figure %s coordinates. Ensure figure number is correct.",s);
+		}
 	} else if (make_png(tmp_job_name) != 0) {
 		show_error(window,"%s","Error converting to png. See stdout for more details.");
 	} else {

@@ -25,8 +25,7 @@ int create_mp_file(char *job_name_in, char *job_name_out) {
 
 	//tell metapost to show the coords in the log
 	fputs("def save_coords = ",file_out);
-	fputs("show \"Figure \" & decimal(charcode) & \" x-coordinate: \" & decimal((xpart llcorner bbox currentpicture) + bboxmargin);",file_out);
-	fputs("show \"Figure \" & decimal(charcode) & \" y-coordinate: \" & decimal((ypart llcorner bbox currentpicture) + bboxmargin);",file_out);
+	fputs("show \"Figure \" & decimal(charcode) & \" coordinates: (\" & decimal((xpart llcorner bbox currentpicture) + bboxmargin) & \",\" & decimal((ypart llcorner bbox currentpicture) + bboxmargin) & \")\";",file_out);
 	//override prologues and outputtemplate
 	fputs("prologues:=3;",file_out);
 	fputs("outputtemplate:=\"%j.%c\";",file_out);
@@ -70,7 +69,7 @@ int get_coords(char *job_name) {
 	ll_y = strtof(buffer+i+1,NULL);*/
 
 	//Method 2: get coords from the log file
-	//Doesn't check that metapost is actually outputting sensible coordinates, just searches for '>> "Figure 1 x-coordinate:' and takes whatever comes after (up to another double-quote) as the x-coord, then whatever's on the next line in the right position as the y-coord.
+	//line will be something like '>> "Figure 1 coordinates: (-359.35,-215.52448)"'
 	FILE *log;
 	char log_filename[strlen(job_name)+5];
 	sprintf(log_filename,"%s.log",job_name);
@@ -80,22 +79,27 @@ int get_coords(char *job_name) {
 		return 1;
 	} else {
 		char substring[50];
-		sprintf(substring,">> \"Figure %d x-coordinate:",fig_num);
+		sprintf(substring,">> \"Figure %d coordinates: ",fig_num);
 
 		while (fgets(buffer,sizeof(buffer),log) != NULL) {
-			buffer[strlen(substring)] = '\0';
-			if (strcmp(buffer,substring) == 0) {
-				int i = strlen(substring) + 1;
-				while (buffer[i] != '"' && i < sizeof(buffer)-1) i++;
-				buffer[i] = '\0';
-				ll_x = strtof(buffer+strlen(substring)+1,NULL);
+			if (strncmp(buffer,substring,strlen(substring)) == 0) {
+				//get x-coord
+				char *x = buffer + strlen(substring) + 1;
+				char *comma = strchr(x,',');
+				if (comma == NULL) break;
+				*comma = '\0';
 
-				fgets(buffer,sizeof(buffer),log); //y-coordinate will be on next line
-				i = strlen(substring) + 1;
-				while (buffer[i] != '"') i++;
-				buffer[i] = '\0';
-				ll_y = strtof(buffer+strlen(substring)+1,NULL);
+				//get y-coord
+				char *y = comma + 1;
+				char *bracket = strchr(y,')');
+				if (bracket == NULL) break;
+				*bracket = '\0';
+
+				ll_x = strtof(x,NULL);
+				ll_y = strtof(y,NULL);
+
 				if (!USE_MPTOPDF) ll_y -= 0.8; //The vertical coordinate seems to be off by about 0.8pt when using mpost. I don't know why. 
+
 				found_coords = true;
 				break;
 			}
@@ -103,16 +107,9 @@ int get_coords(char *job_name) {
 		fclose(log);
 
 		if (!found_coords) {
-			fprintf(stderr,"ERROR: coordinates of lower left corner of diagram not found in '%s.log'.\n",job_name);
-			puts("Ensure that the figure number is correct,");
-			printf("and that %s.mp contains the following lines at the start:\n\n",job_name);
-			puts("prologues:=3;");
-			puts("def save_coords =");
-			puts("	show \"Figure \" & decimal(charcode) & \" x-coordinate: \" & decimal((xpart llcorner bbox currentpicture) + bboxmargin);");
-			puts("	show \"Figure \" & decimal(charcode) & \" y-coordinate: \" & decimal((ypart llcorner bbox currentpicture) + bboxmargin);");
-			puts("enddef;");
-			puts("extra_endfig := extra_endfig & \"save_coords;\";");
-			return 1;
+			fprintf(stderr,"ERROR: figure %d coordinates not found in '%s.log'.\n",fig_num,job_name);
+			puts("Ensure that the figure number is correct.");
+			return 2;
 		} else return 0;
 	}
 
