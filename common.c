@@ -56,6 +56,7 @@ void output_path() {
 			printf("draw %s;\n",s);
 		else if (cur_path->n == 1)
 			printf("drawdot %s;\n",s);
+		free(s);
 	}
 }
 
@@ -172,11 +173,13 @@ void initialise() {
 		init_path(cur_path);
 		if (cur_path->points == NULL) {
 			fprintf(stderr,"Couldn't allocate memory.\n");
+			free(cur_path);
 			exit(EXIT_FAILURE);
 		}
 	}
 }
 void cleanup() {
+	free(cur_path->points);
 	free(cur_path);
 
 	//Probably shouldn't do this, but it's the easiest way for now
