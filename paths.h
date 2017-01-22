@@ -46,7 +46,7 @@ void set_last_coords(double x,double y);
 void set_last_straight(bool is_straight);
 void set_last_point(double x, double y, bool is_straight);
 
-void append_point(double x, double y, bool is_straight);
+int append_point(double x, double y, bool is_straight); //returns 1 if realloc fails
 void remove_point(int i);
 void insert_point(int i, double x, double y, bool is_straight);
 

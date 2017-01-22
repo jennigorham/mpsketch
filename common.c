@@ -48,11 +48,15 @@ double pxl_to_mp_y_coord(int y) {
 
 void output_path() {
 	char *s = path_to_string();
-	copy_to_clipboard(s);
-	if (cur_path->n > 1 || cur_path->n == -1)
-		printf("draw %s;\n",s);
-	else if (cur_path->n == 1)
-		printf("drawdot %s;\n",s);
+	if (s == NULL) {
+		fprintf(stderr,"Couldn't allocate memory.\n");
+	} else {
+		copy_to_clipboard(s);
+		if (cur_path->n > 1 || cur_path->n == -1)
+			printf("draw %s;\n",s);
+		else if (cur_path->n == 1)
+			printf("drawdot %s;\n",s);
+	}
 }
 
 void click_point(int x, int y) {
@@ -89,18 +93,12 @@ void click_point(int x, int y) {
 		);
 		if (mode == CORNER_MODE) {
 			mode = CURVE_MODE;
-			append_point(
-				pxl_to_mp_x_coord(x),
-				pxl_to_mp_y_coord(y),
-				false
-			);
+			if (append_point( pxl_to_mp_x_coord(x), pxl_to_mp_y_coord(y), false) != 0) 
+				fprintf(stderr,"Couldn't allocate memory for extra point.\n");
 		}
 		//point under cursor
-		append_point(
-			pxl_to_mp_x_coord(x),
-			pxl_to_mp_y_coord(y),
-			false
-		);
+		if (append_point( pxl_to_mp_x_coord(x), pxl_to_mp_y_coord(y), false) != 0) 
+			fprintf(stderr,"Couldn't allocate memory for extra point.\n");
 	}
 	redraw_screen();
 }
@@ -167,7 +165,16 @@ void initialise() {
 	snprintf(tmp_job_name,sizeof tmp_job_name,"mpsketch-tmp-%d",pid);
 
 	cur_path = malloc(sizeof(struct path));
-	init_path(cur_path);
+	if (cur_path == NULL) {
+		fprintf(stderr,"Couldn't allocate memory.\n");
+		exit(EXIT_FAILURE);
+	} else {
+		init_path(cur_path);
+		if (cur_path->points == NULL) {
+			fprintf(stderr,"Couldn't allocate memory.\n");
+			exit(EXIT_FAILURE);
+		}
+	}
 }
 void cleanup() {
 	free(cur_path);

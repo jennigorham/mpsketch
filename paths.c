@@ -141,14 +141,21 @@ void set_last_point(double x, double y, bool is_straight) {
 	set_point(cur_path->n-1,x,y,is_straight);
 }
 
-void append_point(double x, double y, bool is_straight) {
+int append_point(double x, double y, bool is_straight) {
 	//allocate more space for points if necessary
 	if (cur_path->n == cur_path->size) {
 		cur_path->size *= 2;
-		cur_path->points = realloc(cur_path->points,cur_path->size * sizeof *cur_path->points);
+		struct point *tmp;
+		tmp = realloc(cur_path->points,cur_path->size * sizeof *cur_path->points);
+		if (tmp == NULL) {
+			cur_path->size /= 2;
+			return 1;
+		}
+		cur_path->points = tmp;
 	}
 	cur_path->n++;
 	set_last_point(x,y,is_straight);
+	return 0;
 }
 void remove_point(int i) {
 	if (i >= 0 && i < cur_path->n) {
@@ -174,6 +181,7 @@ void insert_point(int i, double x, double y, bool is_straight) {
 char *path_to_string() {
 	size_t size = 1000; //initial size of string. enough to hold "fullcircle ..."
 	char *s = malloc(size * sizeof *s);
+	if (s == NULL) return NULL;
 	strcpy(s,"");
 	if (cur_path->n == -1) { //circle
 		double r,delta_x,delta_y;
@@ -209,6 +217,7 @@ char *path_to_string() {
 			if (strlen(s) + sizeof(point) + 20 > size) { //maybe not enough space to fit, so grow s
 				size *= 2;
 				s = realloc(s,size * sizeof *s);
+				if (s == NULL) return NULL;
 			}
 			strcat(s,point);
 			if (i < cur_path->n-1 || cur_path->cycle) {
