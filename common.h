@@ -25,9 +25,11 @@ char tmp_job_name[100];
 int trace_x_offset,trace_y_offset;
 bool show_trace;
 
-int mode; //default drawing mode
+int mode; //drawing mode
 bool finished_drawing; //if true then we're ready to start drawing another path or circle.
-int x_offset; //for scrolling
+
+//for scrolling
+int x_offset;
 int y_offset;
 
 unsigned int win_height;

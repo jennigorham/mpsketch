@@ -5,6 +5,11 @@
 
 /*
 TODO:
+help message
+show something on screen when running mpost or convert
+corner mode
+move trace
+
 desktop file, mime type https://developer.gnome.org/integration-guide/stable/desktop-files.html.en and https://developer.gnome.org/integration-guide/stable/mime.html.en
 tabs for different figures? http://www.cc.gatech.edu/data_files/public/doc/gtk/tutorial/gtk_tut-8.html
 menus? open, help, quit, show/hide trace, change units, precision, change figure
@@ -17,32 +22,34 @@ cairo_t *cr;
 
 GtkWidget *darea;
 
-//rerun metapost, convert to png
-void refresh() {
-	int ret = create_mp_file(job_name,tmp_job_name);
-	if (ret == 1) printf("Couldn't open %s.mp\n",job_name);
-	else if (ret == 2) printf("Couldn't open %s.mp for writing\n",tmp_job_name);
-	else if (run_mpost(tmp_job_name) != 0 || get_coords(tmp_job_name) != 0) {
-		//TODO: error on screen
-	} else if (make_png(tmp_job_name) != 0) {
-		//TODO: error on screen
-	} else {
-		char png[strlen(tmp_job_name)+5];
-		sprintf(png,"%s.png",tmp_job_name);
-		mp_png = cairo_image_surface_create_from_png(png);
-	}
-}
-
-void show_error(gpointer window) {//http://zetcode.com/gui/gtk2/gtkdialogs/
+void show_error(gpointer window,char *fmt,char *msg) {//http://zetcode.com/gui/gtk2/gtkdialogs/
 	GtkWidget *dialog;
 	dialog = gtk_message_dialog_new(GTK_WINDOW(window),
 			GTK_DIALOG_DESTROY_WITH_PARENT,
 			GTK_MESSAGE_ERROR,
 			GTK_BUTTONS_OK,
-			"Error loading file");
+			fmt,msg);
 	gtk_window_set_title(GTK_WINDOW(dialog), "Error");
 	gtk_dialog_run(GTK_DIALOG(dialog));
 	gtk_widget_destroy(dialog);
+}
+
+//rerun metapost, convert to png
+void refresh(gpointer window) {
+	int ret = create_mp_file(job_name,tmp_job_name);
+	if (ret == 1) 
+		show_error(window,"Couldn't open %s.mp",job_name);
+	else if (ret == 2)
+		show_error(window,"Couldn't open %s.mp for writing",tmp_job_name);
+	else if (run_mpost(tmp_job_name) != 0 || get_coords(tmp_job_name) != 0) {
+		show_error(window,"%s","Error running metapost. See stdout for more details.");
+	} else if (make_png(tmp_job_name) != 0) {
+		show_error(window,"%s","Error converting to png. See stdout for more details.");
+	} else {
+		char png[strlen(tmp_job_name)+5];
+		sprintf(png,"%s.png",tmp_job_name);
+		mp_png = cairo_image_surface_create_from_png(png);
+	}
 }
 
 void draw_circle(double centre_x, double centre_y, int r) {
@@ -102,8 +109,10 @@ static gboolean on_draw_event(GtkWidget *widget, cairo_t *this_cr, gpointer user
 		cairo_paint(cr);
 	}
 
-	cairo_set_source_surface(cr, mp_png, -x_offset, -y_offset - cairo_image_surface_get_height(mp_png) + win_height);
-	cairo_paint(cr);
+	if (mp_png) {
+		cairo_set_source_surface(cr, mp_png, -x_offset, -y_offset - cairo_image_surface_get_height(mp_png) + win_height);
+		cairo_paint(cr);
+	}
 
 	cairo_set_source_rgb(cr, 0, 0, 0);
 	cairo_set_line_width(cr, 0.5);
@@ -119,7 +128,6 @@ static gboolean on_draw_event(GtkWidget *widget, cairo_t *this_cr, gpointer user
 
 static gboolean button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data) {
 	if (event->button == 1 && edit) dragging_point = true;
-	//printf("Button %d, (%f,%f)\n",event->button,event->x,event->y);
 	return FALSE;
 }
 
@@ -168,10 +176,10 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 				}
 				break;
 			case GDK_KEY_e:
-				show_error(GTK_WINDOW(widget));
+				show_error(GTK_WINDOW(widget),"%s","Test error message");
 				break;
 			case GDK_KEY_r:
-				refresh();
+				refresh(GTK_WINDOW(widget));
 				redraw_screen();
 				break;
 			case GDK_KEY_q:
@@ -241,7 +249,6 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	initialise();
 
 	if (job_name == NULL) job_name = "test";
-	refresh();
 	//mp_png = cairo_image_surface_create_from_png("test.png");
 
 	window = gtk_application_window_new (app);
@@ -264,6 +271,7 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	g_signal_connect(G_OBJECT(darea), "draw", G_CALLBACK(on_draw_event), NULL);
 
 	gtk_widget_show_all (window);
+	refresh(window);
 }
 
 static void open(GApplication *app,

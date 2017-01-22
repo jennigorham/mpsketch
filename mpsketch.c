@@ -11,8 +11,6 @@
 
 /*
 TODO: 
-port to gtk+
-asprintf in make_png, make_bitmap etc
 string_to_path for circles
 take jobname.mp as first arg, rather than jobname
 do spaces in jobname stuff up the xbm?

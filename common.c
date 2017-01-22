@@ -182,7 +182,7 @@ void cleanup() {
 	free(cur_path->points);
 	free(cur_path);
 
-	//Probably shouldn't do this, but it's the easiest way for now
+	//Get rid of temporary files. Not portable, but it's the easiest way for now
 	char cmd[6 + strlen(tmp_job_name)];
 	sprintf(cmd,"rm %s.*",tmp_job_name);
 	system(cmd);
