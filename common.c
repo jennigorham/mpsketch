@@ -141,18 +141,22 @@ void pointer_move(int x,int y) {
 	} else {
 		//if the user mouses over a point on the path, they can edit it (drag it, change the section after it to straight/curved)
 		int i;
-		edit=false;
+		bool found_point=false;
 		for (i=0;i<(cur_path->n == -1 ? 2 : cur_path->n);i++) {
 			int delta_x, delta_y;
 			delta_x = mp_x_coord_to_pxl(cur_path->points[i].x) - x;
 			delta_y = mp_y_coord_to_pxl(cur_path->points[i].y) - y;
 			if (delta_x*delta_x + delta_y*delta_y < POINT_RADIUS*POINT_RADIUS) {
-				edit=true;
-				edit_point=i;
+				found_point=true;
 				break;
 			}
 		}
-		redraw_screen();
+		//redraw screen if edit or edit_point have changed
+		if (found_point != edit || edit_point != i) {
+			edit = found_point;
+			edit_point = i;
+			redraw_screen();
+		}
 	}
 }
 
