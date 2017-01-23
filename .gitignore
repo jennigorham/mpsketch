@@ -5,4 +5,4 @@ test.log
 test.mpx
 mplib
 *.png
-tmp-mpsketch.*
+mpsketch-tmp-*

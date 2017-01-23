@@ -5,8 +5,7 @@
 
 /*
 TODO:
-help message
-show something on screen when running mpost or convert
+delete, add point
 corner mode
 move trace
 
@@ -21,6 +20,40 @@ cairo_surface_t *trace;
 cairo_t *cr;
 
 GtkWidget *darea;
+GtkWidget *info_bar;
+GtkWidget *message_label;
+
+gchar *get_info_msg() {
+	if (finished_drawing) {
+		if (edit) {
+			if (cur_path->n == -1) {
+				return "Click and drag point. Then press 'y' to yank the new circle.";
+			} else if (cur_path-> n == 1) {
+				return "Click and drag point. Then press 'y' to yank the new coordinates.";
+			} else {
+				if (cur_path->points[edit_point].straight)
+					return "Click and drag point. '.' = curve. 'd' = delete. 'a'/'i' = append/insert point. Enter = toggle cycle. 'y' = yank path.";
+				else
+					return "Click and drag point. '-' = straight. 'd' = delete. 'a'/'i' = append/insert point. Enter = toggle cycle. 'y' = yank path.";
+			}
+		} else {
+			if (mode == CURVE_MODE)
+				return "Click to start drawing a curve. Press '-' for straight line mode, 'c' for circle mode.";
+			else if (mode == STRAIGHT_MODE)
+				return "Click to start drawing straight lines. Press '.' for curve mode, 'c' for circle mode.";
+			else if (mode == CIRCLE_MODE)
+				return "Click to start drawing circle. Press '-' for straight line mode, '.' for curve mode.";
+		}
+	} else {
+		if (mode == CURVE_MODE)
+			return "Click to add point. Escape = end path. Enter = make cycle. '-' = straight line mode.";
+		else if (mode == STRAIGHT_MODE)
+			return "Click to add point. Escape = end path. Enter = make cycle. '.' = curve mode.";
+		else if (mode == CIRCLE_MODE)
+			return "Click to end circle.";
+	}
+	return "";
+}
 
 void show_error(gpointer window,char *fmt,char *msg) {//http://zetcode.com/gui/gtk2/gtkdialogs/
 	GtkWidget *dialog;
@@ -35,7 +68,7 @@ void show_error(gpointer window,char *fmt,char *msg) {//http://zetcode.com/gui/g
 }
 
 //rerun metapost, convert to png
-void refresh(gpointer window) {
+static gboolean refresh(gpointer window) {
 	int ret = create_mp_file(job_name,tmp_job_name);
 	if (ret == 1) 
 		show_error(window,"Couldn't open %s.mp",job_name);
@@ -57,6 +90,9 @@ void refresh(gpointer window) {
 		sprintf(png,"%s.png",tmp_job_name);
 		mp_png = cairo_image_surface_create_from_png(png);
 	}
+	gtk_label_set_text (GTK_LABEL (message_label), get_info_msg());
+	redraw_screen();
+	return FALSE;
 }
 
 void draw_circle(double centre_x, double centre_y, int r) {
@@ -130,6 +166,8 @@ static gboolean on_draw_event(GtkWidget *widget, cairo_t *this_cr, gpointer user
 	draw_path();
 	cairo_stroke(cr);
 
+	gtk_label_set_text (GTK_LABEL (message_label), get_info_msg());
+
 	return FALSE;
 }
 
@@ -160,6 +198,11 @@ static gboolean resize(GtkWidget *widget, GdkEventKey *event, gpointer user_data
 
 void copy_to_clipboard(char *s) {
 	gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD), s, -1);
+
+	//Show it in the info bar too
+	char msg[strlen(s) + strlen("Copied to clipboard: ") + 1];
+	sprintf(msg,"Copied to clipboard: %s",s);
+	gtk_label_set_text(GTK_LABEL (message_label), msg);
 }
 
 static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
@@ -182,25 +225,25 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 					redraw_screen();
 				}
 				break;
-			case GDK_KEY_e:
-				show_error(GTK_WINDOW(widget),"%s","Test error message");
-				break;
 			case GDK_KEY_r:
-				refresh(GTK_WINDOW(widget));
-				redraw_screen();
+				gtk_label_set_text (GTK_LABEL (message_label), "Running metapost...");
+				g_idle_add(refresh,GTK_WINDOW(widget));
 				break;
 			case GDK_KEY_q:
 				gtk_widget_destroy(widget);
 				break;
 			case GDK_KEY_minus:
 				path_mode_change(true);
+				gtk_label_set_text (GTK_LABEL (message_label), get_info_msg());
 				break;
 			case GDK_KEY_period:
 				path_mode_change(false);
+				gtk_label_set_text (GTK_LABEL (message_label), get_info_msg());
 				break;
 			case GDK_KEY_c:
 				if (!finished_drawing) end_path();
 				mode=CIRCLE_MODE;
+				gtk_label_set_text (GTK_LABEL (message_label), get_info_msg());
 				break;
 			case GDK_KEY_y:
 				output_path();
@@ -212,11 +255,11 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 					finished_drawing = true;
 					redraw_screen();
 				}
+				gtk_label_set_text (GTK_LABEL (message_label), get_info_msg());
 				break;
-			default:
-				printf("%d\n",event->keyval);
 		}
 	}
+
 	return FALSE;
 }
 static gboolean on_motion(GtkWidget *widget, GdkEventMotion *event, gpointer user_data) {
@@ -272,10 +315,19 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	g_signal_connect(window, "scroll-event", G_CALLBACK (on_scroll), NULL);
 	g_signal_connect(window, "configure-event", G_CALLBACK(resize), NULL);
 
-	darea = gtk_drawing_area_new();
-	gtk_container_add(GTK_CONTAINER(window), darea);
+	GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+	gtk_container_add(GTK_CONTAINER(window), vbox);
 
+	darea = gtk_drawing_area_new();
+	gtk_box_pack_start(GTK_BOX(vbox), darea, TRUE, TRUE, 0);
 	g_signal_connect(G_OBJECT(darea), "draw", G_CALLBACK(on_draw_event), NULL);
+
+	info_bar = gtk_info_bar_new ();
+	message_label = gtk_label_new (get_info_msg());
+	gtk_widget_show (message_label);
+	GtkWidget *content_area = gtk_info_bar_get_content_area (GTK_INFO_BAR (info_bar));
+	gtk_container_add (GTK_CONTAINER (content_area), message_label);
+	gtk_box_pack_end(GTK_BOX(vbox), info_bar, FALSE, TRUE, 0);
 
 	gtk_widget_show_all (window);
 	refresh(window);
