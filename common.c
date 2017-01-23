@@ -9,17 +9,17 @@ void draw_path() {
 		for (i=0; i<cur_path->n-1; i++) {
 			p = &cur_path->points[i];
 			q = &cur_path->points[i+1];
-			draw_circle(p->x,p->y, POINT_RADIUS);
+			draw_point(p->x,p->y);
 			link_point_pair(p,q);
 		}
 		p = &cur_path->points[cur_path->n-1];
-		draw_circle(p->x,p->y, POINT_RADIUS);
+		draw_point(p->x,p->y);
 		if (cur_path->cycle) {
 			q = &cur_path->points[0];
 			link_point_pair(p,q);
 		}
 	} else if (cur_path->n == 1 && finished_drawing) { //single point
-		draw_circle(cur_path->points[0].x,cur_path->points[0].y,POINT_RADIUS); 
+		draw_point(cur_path->points[0].x,cur_path->points[0].y); 
 	} else if ((mode == CIRCLE_MODE && !finished_drawing) || cur_path->n == -1) {//a circle is being drawn or has just been drawn
 		double delta_x,delta_y, r;
 		delta_x = cur_path->points[0].x - cur_path->points[1].x;
@@ -27,8 +27,8 @@ void draw_path() {
 		r = sqrt(delta_x*delta_x + delta_y*delta_y) / INCH * density;
 
 		draw_circle(cur_path->points[0].x,cur_path->points[0].y,(int) r);
-		draw_circle(cur_path->points[0].x,cur_path->points[0].y,POINT_RADIUS);
-		draw_circle(cur_path->points[1].x,cur_path->points[1].y,POINT_RADIUS);
+		draw_point(cur_path->points[0].x,cur_path->points[0].y);
+		draw_point(cur_path->points[1].x,cur_path->points[1].y);
 	}
 }
 
@@ -75,6 +75,7 @@ void click_point(int x, int y) {
 			set_coords(0,pxl_to_mp_x_coord(x),pxl_to_mp_y_coord(y));
 			set_coords(1,pxl_to_mp_x_coord(x),pxl_to_mp_y_coord(y));
 			finished_drawing = false;
+			mode_change();
 		} else {
 			set_coords(1,pxl_to_mp_x_coord(x),pxl_to_mp_y_coord(y));
 			finished_drawing=true;
@@ -100,12 +101,13 @@ void click_point(int x, int y) {
 		//point under cursor
 		if (append_point( pxl_to_mp_x_coord(x), pxl_to_mp_y_coord(y), false) != 0) 
 			fprintf(stderr,"Couldn't allocate memory for extra point.\n");
+		mode_change();
 	}
 	redraw_screen();
 }
 
 void end_path() {
-	cur_path->n--; //remove the extra point under the cursor. for circles, sets n to -1 so we know it's a circle
+	if (mode == CIRCLE_MODE) cur_path->n = -1;
 	output_path();
 	finished_drawing=true;
 	redraw_screen();
@@ -126,10 +128,7 @@ void path_mode_change(bool is_straight) {
 
 void pointer_move(int x,int y) {
 	if (!finished_drawing) {
-		if (mode == CIRCLE_MODE)
-			set_coords(1,pxl_to_mp_x_coord(x),pxl_to_mp_y_coord(y));
-		else
-			set_coords(cur_path->n-1,pxl_to_mp_x_coord(x),pxl_to_mp_y_coord(y));
+		set_coords(mode==CIRCLE_MODE ? 1 : cur_path->n-1,pxl_to_mp_x_coord(x),pxl_to_mp_y_coord(y));
 		redraw_screen();
 	} else if (dragging_point) {
 		set_coords(
@@ -155,6 +154,7 @@ void pointer_move(int x,int y) {
 		if (found_point != edit || edit_point != i) {
 			edit = found_point;
 			edit_point = i;
+			mode_change(); //for gtk to update info bar
 			redraw_screen();
 		}
 	}
@@ -183,11 +183,15 @@ void initialise() {
 	}
 }
 void cleanup() {
-	free(cur_path->points);
-	free(cur_path);
+	if (cur_path) {
+		if (cur_path->points) free(cur_path->points);
+		free(cur_path);
+	}
 
 	//Get rid of temporary files. Not portable, but it's the easiest way for now
-	char cmd[6 + strlen(tmp_job_name)];
-	sprintf(cmd,"rm %s.*",tmp_job_name);
-	system(cmd);
+	if (*tmp_job_name != '\0') {
+		char cmd[6 + strlen(tmp_job_name)];
+		sprintf(cmd,"rm %s.*",tmp_job_name);
+		system(cmd);
+	}
 }

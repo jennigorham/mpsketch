@@ -54,12 +54,14 @@ void end_path();
 void click_point(int x, int y); //when the user clicks to add a point to the path, or create a circle
 void pointer_move(int x,int y);
 
+void initialise();
+void cleanup();
+
 //defined in mpsketch.c or gtk-test.c
 void draw_circle(double centre_x, double centre_y, int r);
+void draw_point(double centre_x, double centre_y);
 void link_point_pair(struct point *p, struct point *q); //draw either a straight line or a bezier curve linking two consecutive points on a path
 void copy_to_clipboard(char *s);
 void redraw_screen();
-
-void initialise();
-void cleanup();
+void mode_change(); //for gtk to update info bar
 #endif

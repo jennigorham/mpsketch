@@ -62,8 +62,14 @@ void draw_bezier(double start_x, double start_y, double start_right_x, double st
 void output_path();//print the path and copy to clipboard
 void refresh(); //rerun metapost if necessary, otherwise just rerun convert (if metapost has already been run from elsewhere).
 
+void mode_change() {
+}
+
 void draw_circle(double centre_x, double centre_y, int r) {
 		XDrawArc(d,w,gc, mp_x_coord_to_pxl(centre_x) - r, mp_y_coord_to_pxl(centre_y) - r, 2*r, 2*r, 0, 360*64);
+}
+void draw_point(double centre_x, double centre_y) {
+		draw_circle(centre_x,centre_y,POINT_RADIUS);
 }
 void fill_circle(double centre_x, double centre_y, int r) {
 		XFillArc(d,w,gc, mp_x_coord_to_pxl(centre_x) - r, mp_y_coord_to_pxl(centre_y) - r, 2*r, 2*r, 0, 360*64);
@@ -342,13 +348,8 @@ void keypress(int keycode,int state) {
 			end_path();
 		break;
 	case 36://Return
-		if (!finished_drawing) {
-			cur_path->cycle = true;
-			end_path();
-		} else if (edit) {
-			cur_path->cycle = !cur_path->cycle;
-			redraw_screen();
-		}
+		cur_path->cycle = !cur_path->cycle;
+		redraw_screen();
 		break;
 	case 43://d - delete a point
 		if (edit) {

@@ -8,6 +8,8 @@ TODO:
 delete, add point
 corner mode
 move trace
+u = undo last point
+ctrl-c and ctrl-v for y and p as well
 
 desktop file, mime type https://developer.gnome.org/integration-guide/stable/desktop-files.html.en and https://developer.gnome.org/integration-guide/stable/mime.html.en
 tabs for different figures? http://www.cc.gatech.edu/data_files/public/doc/gtk/tutorial/gtk_tut-8.html
@@ -24,6 +26,7 @@ GtkWidget *info_bar;
 GtkWidget *message_label;
 
 gchar *get_info_msg() {
+	//not mentioned: 'r' to refresh metapost, and 'p' to push path
 	if (finished_drawing) {
 		if (edit) {
 			if (cur_path->n == -1) {
@@ -31,10 +34,12 @@ gchar *get_info_msg() {
 			} else if (cur_path-> n == 1) {
 				return "Click and drag point. Then press 'y' to yank the new coordinates.";
 			} else {
-				if (cur_path->points[edit_point].straight)
-					return "Click and drag point. '.' = curve. 'd' = delete. 'a'/'i' = append/insert point. Enter = toggle cycle. 'y' = yank path.";
+				if (edit_point == cur_path->n - 1) { //can't change to curve/straight since there's nothing after last point
+					return "Click and drag point to move. Then press 'y' to yank path.\n'd' = delete. 'a'/'i' = append/insert point. Enter = toggle cycle.";
+				} else if (cur_path->points[edit_point].straight)
+					return "Click and drag point to move. Then press 'y' to yank path.\n'.' = curve. 'd' = delete. 'a'/'i' = append/insert point. Enter = toggle cycle.";
 				else
-					return "Click and drag point. '-' = straight. 'd' = delete. 'a'/'i' = append/insert point. Enter = toggle cycle. 'y' = yank path.";
+					return "Click and drag point to move. Then press 'y' to yank path.\n'-' = straight. 'd' = delete. 'a'/'i' = append/insert point. Enter = toggle cycle.";
 			}
 		} else {
 			if (mode == CURVE_MODE)
@@ -46,13 +51,17 @@ gchar *get_info_msg() {
 		}
 	} else {
 		if (mode == CURVE_MODE)
-			return "Click to add point. Escape = end path. Enter = make cycle. '-' = straight line mode.";
+			return "Click to add point. Escape = end path. Enter = toggle cycle. '-' = straight line mode.";
 		else if (mode == STRAIGHT_MODE)
-			return "Click to add point. Escape = end path. Enter = make cycle. '.' = curve mode.";
+			return "Click to add point. Escape = end path. Enter = toggle cycle. '.' = curve mode.";
 		else if (mode == CIRCLE_MODE)
 			return "Click to end circle.";
 	}
 	return "";
+}
+
+void mode_change() {
+	gtk_label_set_text (GTK_LABEL (message_label), get_info_msg());
 }
 
 void show_error(gpointer window,char *fmt,char *msg) {//http://zetcode.com/gui/gtk2/gtkdialogs/
@@ -90,20 +99,27 @@ static gboolean refresh(gpointer window) {
 		sprintf(png,"%s.png",tmp_job_name);
 		mp_png = cairo_image_surface_create_from_png(png);
 	}
-	gtk_label_set_text (GTK_LABEL (message_label), get_info_msg());
+	mode_change();
 	redraw_screen();
 	return FALSE;
-}
-
-void draw_circle(double centre_x, double centre_y, int r) {
-	cairo_new_sub_path(cr);
-	cairo_arc(cr, mp_x_coord_to_pxl(centre_x), mp_y_coord_to_pxl(centre_y), r, 0, 2*M_PI);
 }
 
 void fill_circle(double centre_x, double centre_y, int r) {
 	cairo_new_sub_path(cr);
 	cairo_arc(cr, mp_x_coord_to_pxl(centre_x), mp_y_coord_to_pxl(centre_y), r, 0, 2*M_PI);
 	cairo_fill(cr);
+}
+
+void draw_circle(double centre_x, double centre_y, int r) {
+	cairo_arc(cr, mp_x_coord_to_pxl(centre_x), mp_y_coord_to_pxl(centre_y), r, 0, 2*M_PI);
+	cairo_stroke(cr);
+}
+
+void draw_point(double centre_x, double centre_y) {
+	cairo_set_source_rgb(cr, 1, 1, 1);
+	fill_circle(centre_x,centre_y,POINT_RADIUS);
+	cairo_set_source_rgb(cr, 0, 0, 0);
+	draw_circle(centre_x,centre_y,POINT_RADIUS);
 }
 
 void draw_bezier(double start_x, double start_y, double start_right_x, double start_right_y, double end_left_x, double end_left_y, double end_x, double end_y) {
@@ -144,10 +160,11 @@ void link_point_pair(struct point *p, struct point *q) {
 			q->y
 		);
 	}
+	cairo_stroke(cr);
 }
 static gboolean on_draw_event(GtkWidget *widget, cairo_t *this_cr, gpointer user_data) {
 	cr = this_cr; //make it global. Otherwise I'd have to pass it to draw_path which would no longer be common between the xlib and gtk versions
-	if (show_trace) {
+	if (show_trace && trace) {
 		cairo_set_source_surface(cr, trace, trace_x_offset, trace_y_offset);
 		cairo_paint(cr);
 	}
@@ -160,13 +177,11 @@ static gboolean on_draw_event(GtkWidget *widget, cairo_t *this_cr, gpointer user
 	cairo_set_source_rgb(cr, 0, 0, 0);
 	cairo_set_line_width(cr, 0.5);
 
-	if (edit)
-		fill_circle(cur_path->points[edit_point].x,cur_path->points[edit_point].y,POINT_RADIUS);
-
 	draw_path();
 	cairo_stroke(cr);
 
-	gtk_label_set_text (GTK_LABEL (message_label), get_info_msg());
+	if (edit)
+		fill_circle(cur_path->points[edit_point].x,cur_path->points[edit_point].y,POINT_RADIUS);
 
 	return FALSE;
 }
@@ -217,13 +232,12 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 					end_path();
 				break;
 			case GDK_KEY_Return:
-				if (!finished_drawing) {
-					cur_path->cycle = true;
-					end_path();
-				} else if (edit) {
-					cur_path->cycle = !cur_path->cycle;
-					redraw_screen();
-				}
+				cur_path->cycle = !cur_path->cycle;
+				redraw_screen();
+				break;
+			case GDK_KEY_t:
+				show_trace = !show_trace;
+				redraw_screen();
 				break;
 			case GDK_KEY_r:
 				gtk_label_set_text (GTK_LABEL (message_label), "Running metapost...");
@@ -234,16 +248,16 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 				break;
 			case GDK_KEY_minus:
 				path_mode_change(true);
-				gtk_label_set_text (GTK_LABEL (message_label), get_info_msg());
+				mode_change();
 				break;
 			case GDK_KEY_period:
 				path_mode_change(false);
-				gtk_label_set_text (GTK_LABEL (message_label), get_info_msg());
+				mode_change();
 				break;
 			case GDK_KEY_c:
 				if (!finished_drawing) end_path();
 				mode=CIRCLE_MODE;
-				gtk_label_set_text (GTK_LABEL (message_label), get_info_msg());
+				mode_change();
 				break;
 			case GDK_KEY_y:
 				output_path();
@@ -255,7 +269,7 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 					finished_drawing = true;
 					redraw_screen();
 				}
-				gtk_label_set_text (GTK_LABEL (message_label), get_info_msg());
+				mode_change();
 				break;
 		}
 	}
@@ -360,8 +374,8 @@ static gboolean get_unit(gchar *option_name,gchar *value,gpointer data,GError **
 		return FALSE;
 	}
 	coord_precision = ceil(log10(unit)); //choose a sensible number of decimal places for coordinates
-	printf("unit=%f\n",unit);
-	printf("precision=%d\n",coord_precision);
+	//printf("unit=%f\n",unit);
+	//printf("precision=%d\n",coord_precision);
 	return TRUE;
 }
 static gboolean get_trace(gchar *option_name,gchar *value,gpointer data,GError **error) {
@@ -370,7 +384,7 @@ static gboolean get_trace(gchar *option_name,gchar *value,gpointer data,GError *
 	trace_y_offset = 0;
 	trace = cairo_image_surface_create_from_png(value);
 	if (cairo_surface_status(trace) != CAIRO_STATUS_SUCCESS) {
-		g_print("Couldn't get trace image.\n");
+		g_set_error(error,G_OPTION_ERROR, G_OPTION_ERROR_FAILED,"Couldn't get trace image from %s.\n",value);
 		return FALSE;
 	}
 
@@ -384,10 +398,6 @@ int main (int argc, char **argv) {
 	unit_name = "";
 	fig_num = 1;
 	show_trace = false;
-
-	//Coding these in for now until I set up mptoraster
-	ll_x = -359.35;
-	ll_y = -215.52;
 
 	GOptionEntry entries[] =
 	{
