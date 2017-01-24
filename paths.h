@@ -50,4 +50,8 @@ int append_point(double x, double y, bool is_straight); //returns 1 if realloc f
 void remove_point(int i);
 void insert_point(int i, double x, double y, bool is_straight);
 
+double bezier(double start, double start_right, double end_left, double end, double t);
+
+void point_before(int i);//create a point inbetween two others
+
 #endif

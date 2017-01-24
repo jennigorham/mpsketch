@@ -71,7 +71,7 @@ void string_to_path(char *s) {
 }
 
 //find the bezier control points for all the points on the path
-void find_control_points(struct path *p) {
+void find_control_points() {
 	MP mp;
 	mp_knot first_knot, last_knot;
 	MP_options * opt = mp_options () ;
@@ -228,4 +228,34 @@ char *path_to_string() {
 		if (cur_path->cycle) strcat(s,"cycle");
 	}
 	return s;
+}
+
+//Find X(t) or Y(t) given coords of two points on curve and control points between them
+double bezier (double start, double start_right, double end_left, double end, double t) {
+	return (1-t)*(1-t)*(1-t)*start + 3*t*(1-t)*(1-t)*start_right + 3*t*t*(1-t)*end_left + t*t*t*end;
+}
+
+void point_before(int i) {
+	find_control_points();
+	if (i==0) {//before first point
+		struct point p = cur_path->points[0];
+		insert_point(i,
+			2*p.x - p.right_x,
+			2*p.y - p.right_y,
+			p.straight);
+	} else if (i==cur_path->n) {//after last point
+		struct point p = cur_path->points[cur_path->n-1];
+		append_point(
+			2*p.x - p.left_x,
+			2*p.y - p.left_y,
+			p.straight);
+	} else {
+		//choose point halfway along path between the two points
+		struct point p = cur_path->points[i-1];
+		struct point q = cur_path->points[i];
+		insert_point(i,
+			bezier(p.x,p.right_x,q.left_x,q.x,0.5),
+			bezier(p.y,p.right_y,q.left_y,q.y,0.5),
+			p.straight);
+	}
 }

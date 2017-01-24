@@ -5,12 +5,12 @@
 
 /*
 TODO:
-delete, add point
 corner mode
 move trace
 u = undo last point
 ctrl-c and ctrl-v for y and p as well
 keybindings dialog
+custom precision
 
 desktop file, mime type https://developer.gnome.org/integration-guide/stable/desktop-files.html.en and https://developer.gnome.org/integration-guide/stable/mime.html.en
 tabs for different figures? http://www.cc.gatech.edu/data_files/public/doc/gtk/tutorial/gtk_tut-8.html
@@ -232,11 +232,25 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 				} else
 					end_path();
 				break;
-			case GDK_KEY_Return:
+			case GDK_KEY_Return: //toggle cycle
 				cur_path->cycle = !cur_path->cycle;
 				redraw_screen();
 				break;
-			case GDK_KEY_d:
+			case GDK_KEY_i: //insert point before edit_point
+				if (edit) {
+					point_before(edit_point);
+					edit_point++;
+					redraw_screen();
+				}
+				break;
+			case GDK_KEY_a: //append point after edit_point
+				if (edit) {
+					point_before(edit_point+1);
+					redraw_screen();
+					mode_change();
+				}
+				break;
+			case GDK_KEY_d: //delete point
 				if (edit) {
 					remove_point(edit_point);
 					edit=false;
@@ -244,34 +258,34 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 					mode_change();
 				}
 				break;
-			case GDK_KEY_t:
+			case GDK_KEY_t: //toggle trace visibility
 				show_trace = !show_trace;
 				redraw_screen();
 				break;
-			case GDK_KEY_r:
+			case GDK_KEY_r: //refresh metapost
 				gtk_label_set_text (GTK_LABEL (message_label), "Running metapost...");
 				g_idle_add(refresh,GTK_WINDOW(widget));
 				break;
-			case GDK_KEY_q:
+			case GDK_KEY_q: //quit
 				gtk_widget_destroy(widget);
 				break;
-			case GDK_KEY_minus:
+			case GDK_KEY_minus: //straight line mode
 				path_mode_change(true);
 				mode_change();
 				break;
-			case GDK_KEY_period:
+			case GDK_KEY_period: //curve mode
 				path_mode_change(false);
 				mode_change();
 				break;
-			case GDK_KEY_c:
+			case GDK_KEY_c: //circle mode
 				if (!finished_drawing) end_path();
 				mode=CIRCLE_MODE;
 				mode_change();
 				break;
-			case GDK_KEY_y:
+			case GDK_KEY_y: //yank
 				output_path();
 				break;
-			case GDK_KEY_p: ;
+			case GDK_KEY_p: ; //push
 				gchar *text = gtk_clipboard_wait_for_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
 				if (text != NULL) {
 					string_to_path(text);

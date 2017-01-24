@@ -56,7 +56,6 @@ void move_point(); //when you click and drag a point on a path/circle
 void show_help(); //display message about usage
 void show_msg(int pos,char *msg); //display message
 
-double bezier(double start, double start_right, double end_left, double end, double t);
 void draw_bezier(double start_x, double start_y, double start_right_x, double start_right_y, double end_left_x, double end_left_y, double end_x, double end_y); //draw the cubic bezier curve connecting two points
 
 void output_path();//print the path and copy to clipboard
@@ -139,10 +138,6 @@ void zoom() { //remake the bitmap after density change
 	} else error();
 }
 
-//Find X(t) or Y(t) given coords of two points on curve and control points between them
-double bezier (double start, double start_right, double end_left, double end, double t) {
-	return (1-t)*(1-t)*(1-t)*start + 3*t*(1-t)*(1-t)*start_right + 3*t*t*(1-t)*end_left + t*t*t*end;
-}
 //draw the cubic bezier curve connecting two points
 void draw_bezier (double start_x, double start_y, double start_right_x, double start_right_y, double end_left_x, double end_left_y, double end_x, double end_y) {
 	int i;
@@ -359,29 +354,15 @@ void keypress(int keycode,int state) {
 		}
 		break;
 	case 42://i - insert a point before current point
-		if (edit && edit_point > 0) {
-			find_control_points();
-			struct point p = cur_path->points[edit_point-1];
-			struct point q = cur_path->points[edit_point];
-			insert_point(edit_point,
-				bezier(p.x,p.right_x,q.left_x,q.x,0.5),
-				bezier(p.y,p.right_y,q.left_y,q.y,0.5),
-				p.straight
-			);
+		if (edit) {
+			point_before(edit_point);
 			edit_point++;
 			redraw_screen();
 		}
 		break;
 	case 38://a - insert a point after current point
-		if (edit && edit_point < cur_path->n-1) {
-			find_control_points();
-			struct point p = cur_path->points[edit_point];
-			struct point q = cur_path->points[edit_point+1];
-			insert_point(edit_point+1,
-				bezier(p.x,p.right_x,q.left_x,q.x,0.5),
-				bezier(p.y,p.right_y,q.left_y,q.y,0.5),
-				p.straight
-			);
+		if (edit) {
+			point_before(edit_point+1);
 			redraw_screen();
 		}
 		break;
