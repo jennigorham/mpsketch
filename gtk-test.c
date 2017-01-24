@@ -3,6 +3,8 @@
 
 #include "common.h"
 
+#define MP_BORDER 200 //extra space around the mp png
+
 /*
 TODO:
 corner mode
@@ -11,6 +13,8 @@ u = undo last point
 ctrl-c and ctrl-v for y and p as well
 keybindings dialog
 custom precision
+check for find_control_points() failure?
+zoom
 
 desktop file, mime type https://developer.gnome.org/integration-guide/stable/desktop-files.html.en and https://developer.gnome.org/integration-guide/stable/mime.html.en
 tabs for different figures? http://www.cc.gatech.edu/data_files/public/doc/gtk/tutorial/gtk_tut-8.html
@@ -25,6 +29,10 @@ cairo_t *cr;
 GtkWidget *darea;
 GtkWidget *info_bar;
 GtkWidget *message_label;
+GtkWidget *scrolled_window;
+
+GtkAdjustment *hadj;
+GtkAdjustment *vadj;
 
 gchar *get_info_msg() {
 	//not mentioned: 'r' to refresh metapost, 't' to toggle trace, and 'p' to push path
@@ -99,6 +107,13 @@ static gboolean refresh(gpointer window) {
 		char png[strlen(tmp_job_name)+5];
 		sprintf(png,"%s.png",tmp_job_name);
 		mp_png = cairo_image_surface_create_from_png(png);
+
+		//adjust the drawing area to the new size of the mp image
+		gtk_widget_set_size_request(
+			darea,
+			cairo_image_surface_get_width(mp_png) + 2*MP_BORDER,
+			cairo_image_surface_get_height(mp_png) + 2*MP_BORDER);
+		y_offset = -MP_BORDER - cairo_image_surface_get_height(mp_png) + win_height;
 	}
 	mode_change();
 	redraw_screen();
@@ -171,7 +186,7 @@ static gboolean on_draw_event(GtkWidget *widget, cairo_t *this_cr, gpointer user
 	}
 
 	if (mp_png) {
-		cairo_set_source_surface(cr, mp_png, -x_offset, -y_offset - cairo_image_surface_get_height(mp_png) + win_height);
+		cairo_set_source_surface(cr, mp_png, MP_BORDER, MP_BORDER);
 		cairo_paint(cr);
 	}
 
@@ -193,8 +208,11 @@ static gboolean button_press(GtkWidget *widget, GdkEventButton *event, gpointer 
 }
 
 static gboolean button_release(GtkWidget *widget, GdkEventButton *event, gpointer user_data) {
+	double x,y;
+	x = event->x + gtk_adjustment_get_value(hadj);
+	y = event->y + gtk_adjustment_get_value(vadj);
 	if (event->button == 1) 
-		click_point(event->x,event->y);
+		click_point(x,y);
 	return FALSE;
 }
 
@@ -207,8 +225,7 @@ static gboolean resize(GtkWidget *widget, GdkEventKey *event, gpointer user_data
 	gtk_window_get_size(GTK_WINDOW(widget), &width, &height);
 	win_width = (unsigned int) width;
 	win_height = (unsigned int) height;
-	//printf("Resize: %d,%d\n",win_width,win_height);
-	redraw_screen();
+	y_offset = -MP_BORDER - cairo_image_surface_get_height(mp_png) + win_height;
 	return FALSE;
 }
 
@@ -304,29 +321,9 @@ static gboolean on_motion(GtkWidget *widget, GdkEventMotion *event, gpointer use
 	GdkModifierType state;
 	GdkDevice *device=gdk_event_get_source_device((GdkEvent *)event);
 	gdk_window_get_device_position(event->window,device,&x,&y,&state);
+	x += gtk_adjustment_get_value(hadj);
+	y += gtk_adjustment_get_value(vadj);
 	pointer_move(x,y);
-	return FALSE;
-}
-
-static gboolean on_scroll(GtkWidget* widget, GdkEventScroll* event, gpointer user_data) {
-	switch (event->direction) {
-		case GDK_SCROLL_UP:
-			y_offset -= SCROLL_STEP;
-			break;
-		case GDK_SCROLL_DOWN:
-			y_offset += SCROLL_STEP;
-			break;
-		case GDK_SCROLL_LEFT:
-			x_offset -= SCROLL_STEP;
-			break;
-		case GDK_SCROLL_RIGHT:
-			x_offset += SCROLL_STEP;
-			break;
-		case GDK_SCROLL_SMOOTH:
-			puts("Smooth scrolling not implemented yet. Sorry.");
-			break;
-	}
-	gtk_widget_queue_draw(widget);
 	return FALSE;
 }
 
@@ -341,6 +338,7 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	window = gtk_application_window_new (app);
 	gtk_window_set_title (GTK_WINDOW (window), "MPSketch");
 	gtk_window_set_default_size (GTK_WINDOW (window), 200, 200);
+	x_offset = -MP_BORDER;
 	gtk_widget_add_events(window, GDK_BUTTON_PRESS_MASK);
 	gtk_widget_add_events(window, GDK_POINTER_MOTION_MASK);
 	gtk_widget_add_events(window, GDK_BUTTON_RELEASE_MASK);
@@ -349,15 +347,23 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	g_signal_connect(window, "button-release-event", G_CALLBACK(button_release), NULL);
 	g_signal_connect(window, "key-press-event", G_CALLBACK (key_press), NULL);
 	g_signal_connect(window, "motion-notify-event", G_CALLBACK (on_motion), NULL);
-	g_signal_connect(window, "scroll-event", G_CALLBACK (on_scroll), NULL);
 	g_signal_connect(window, "configure-event", G_CALLBACK(resize), NULL);
 
 	GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	gtk_container_add(GTK_CONTAINER(window), vbox);
 
+	scrolled_window = gtk_scrolled_window_new (NULL, NULL);
+	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolled_window),
+		GTK_POLICY_AUTOMATIC, 
+		GTK_POLICY_AUTOMATIC);
+
 	darea = gtk_drawing_area_new();
-	gtk_box_pack_start(GTK_BOX(vbox), darea, TRUE, TRUE, 0);
+	gtk_container_add(GTK_CONTAINER(scrolled_window),darea);
+	gtk_box_pack_start(GTK_BOX(vbox), scrolled_window, TRUE, TRUE, 0);
 	g_signal_connect(G_OBJECT(darea), "draw", G_CALLBACK(on_draw_event), NULL);
+	GtkWidget *child = gtk_bin_get_child(GTK_BIN(scrolled_window));
+	hadj = gtk_scrollable_get_hadjustment(GTK_SCROLLABLE(child));
+	vadj = gtk_scrollable_get_vadjustment(GTK_SCROLLABLE(child));
 
 	info_bar = gtk_info_bar_new ();
 	message_label = gtk_label_new (get_info_msg());
@@ -430,7 +436,7 @@ int main (int argc, char **argv) {
 		{ "trace", 't', G_OPTION_FLAG_FILENAME, G_OPTION_ARG_CALLBACK, (GOptionArgFunc) get_trace, "PNG file to trace over.", "<filename>" },
 		{NULL}
 	};
-	
+
 	GtkApplication *app;
 	int status;
 
