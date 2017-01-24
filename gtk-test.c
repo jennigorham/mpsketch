@@ -10,6 +10,7 @@ corner mode
 move trace
 u = undo last point
 ctrl-c and ctrl-v for y and p as well
+keybindings dialog
 
 desktop file, mime type https://developer.gnome.org/integration-guide/stable/desktop-files.html.en and https://developer.gnome.org/integration-guide/stable/mime.html.en
 tabs for different figures? http://www.cc.gatech.edu/data_files/public/doc/gtk/tutorial/gtk_tut-8.html
@@ -26,7 +27,7 @@ GtkWidget *info_bar;
 GtkWidget *message_label;
 
 gchar *get_info_msg() {
-	//not mentioned: 'r' to refresh metapost, and 'p' to push path
+	//not mentioned: 'r' to refresh metapost, 't' to toggle trace, and 'p' to push path
 	if (finished_drawing) {
 		if (edit) {
 			if (cur_path->n == -1) {
@@ -34,7 +35,7 @@ gchar *get_info_msg() {
 			} else if (cur_path-> n == 1) {
 				return "Click and drag point. Then press 'y' to yank the new coordinates.";
 			} else {
-				if (edit_point == cur_path->n - 1) { //can't change to curve/straight since there's nothing after last point
+				if (!cur_path->cycle && edit_point == cur_path->n - 1) { //can't change to curve/straight since there's nothing after last point
 					return "Click and drag point to move. Then press 'y' to yank path.\n'd' = delete. 'a'/'i' = append/insert point. Enter = toggle cycle.";
 				} else if (cur_path->points[edit_point].straight)
 					return "Click and drag point to move. Then press 'y' to yank path.\n'.' = curve. 'd' = delete. 'a'/'i' = append/insert point. Enter = toggle cycle.";
@@ -234,6 +235,14 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 			case GDK_KEY_Return:
 				cur_path->cycle = !cur_path->cycle;
 				redraw_screen();
+				break;
+			case GDK_KEY_d:
+				if (edit) {
+					remove_point(edit_point);
+					edit=false;
+					redraw_screen();
+					mode_change();
+				}
 				break;
 			case GDK_KEY_t:
 				show_trace = !show_trace;
