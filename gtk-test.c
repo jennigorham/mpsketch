@@ -368,6 +368,13 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 					mode_change();
 				}
 				break;
+			case GDK_KEY_x:
+				if (event->state & GDK_CONTROL_MASK) { //ctrl-x cut
+					output_path();
+					cur_path->n = 0;
+					redraw_screen();
+				}
+				break;
 			case GDK_KEY_y: //yank
 				output_path();
 				break;
