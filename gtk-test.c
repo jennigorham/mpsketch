@@ -10,7 +10,6 @@ TODO:
 corner mode
 move trace
 u = undo last point
-ctrl-c and ctrl-v for y and p as well
 keybindings dialog
 custom precision
 check for find_control_points() failure?
@@ -272,6 +271,17 @@ void copy_to_clipboard(char *s) {
 	gtk_label_set_text(GTK_LABEL (message_label), msg);
 }
 
+void push_path() {
+	gchar *text = gtk_clipboard_wait_for_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
+	if (text != NULL) {
+		string_to_path(text);
+		finished_drawing = true;
+		if (cur_path->n != 0) scroll_to(cur_path->points[0].x,cur_path->points[0].y);
+		redraw_screen();
+	}
+	mode_change();
+}
+
 static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
 	///usr/include/gtk-3.0/gdk/gdkkeysyms.h
 	if (!dragging_point) {
@@ -344,23 +354,25 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 				path_mode_change(false);
 				mode_change();
 				break;
-			case GDK_KEY_c: //circle mode
-				if (!finished_drawing) end_path();
-				mode=CIRCLE_MODE;
-				mode_change();
+			case GDK_KEY_v:
+				if (event->state & GDK_CONTROL_MASK) { //ctrl-v paste
+					push_path();
+				}
+				break;
+			case GDK_KEY_c:
+				if (event->state & GDK_CONTROL_MASK) { //ctrl-c copy
+					output_path();
+				} else { //circle mode
+					if (!finished_drawing) end_path();
+					mode=CIRCLE_MODE;
+					mode_change();
+				}
 				break;
 			case GDK_KEY_y: //yank
 				output_path();
 				break;
 			case GDK_KEY_p: ; //push
-				gchar *text = gtk_clipboard_wait_for_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
-				if (text != NULL) {
-					string_to_path(text);
-					finished_drawing = true;
-					if (cur_path->n != 0) scroll_to(cur_path->points[0].x,cur_path->points[0].y);
-					redraw_screen();
-				}
-				mode_change();
+				push_path();
 				break;
 		}
 	}
