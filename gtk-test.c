@@ -271,12 +271,23 @@ void copy_to_clipboard(char *s) {
 	gtk_label_set_text(GTK_LABEL (message_label), msg);
 }
 
+bool is_off_screen(double x, double y) {
+	int screen_x = mp_x_coord_to_pxl(x) - gtk_adjustment_get_value(hadj);
+	int screen_y = mp_y_coord_to_pxl(y) - gtk_adjustment_get_value(vadj);
+	GtkAllocation alloc;
+	GtkWidget *child = gtk_bin_get_child(GTK_BIN(scrolled_window));
+	gtk_widget_get_allocation(child, &alloc);
+	return (screen_x < 0 || screen_x > alloc.width || screen_y < 0 || screen_y > alloc.height);
+}
+
 void push_path() {
 	gchar *text = gtk_clipboard_wait_for_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
 	if (text != NULL) {
 		string_to_path(text);
 		finished_drawing = true;
-		if (cur_path->n != 0) scroll_to(cur_path->points[0].x,cur_path->points[0].y);
+		struct point fp = cur_path->points[0]; //first point
+		if (cur_path->n != 0 && is_off_screen(fp.x,fp.y))
+			scroll_to(fp.x,fp.y);
 		redraw_screen();
 	}
 	mode_change();
