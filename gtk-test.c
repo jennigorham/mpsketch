@@ -14,7 +14,7 @@ ctrl-c and ctrl-v for y and p as well
 keybindings dialog
 custom precision
 check for find_control_points() failure?
-zoom
+can't drawdot now that Esc behaviour changed
 
 desktop file, mime type https://developer.gnome.org/integration-guide/stable/desktop-files.html.en and https://developer.gnome.org/integration-guide/stable/mime.html.en
 tabs for different figures? http://www.cc.gatech.edu/data_files/public/doc/gtk/tutorial/gtk_tut-8.html
@@ -33,6 +33,16 @@ GtkWidget *scrolled_window;
 
 GtkAdjustment *hadj;
 GtkAdjustment *vadj;
+
+gint win_width,win_height;
+
+
+//mp coords of centre of window
+double scroll_centre_x;
+double scroll_centre_y;
+
+//scale of mp_png
+double scale;
 
 gchar *get_info_msg() {
 	//not mentioned: 'r' to refresh metapost, 't' to toggle trace, and 'p' to push path
@@ -85,6 +95,16 @@ void show_error(gpointer window,char *fmt,char *msg) {//http://zetcode.com/gui/g
 	gtk_widget_destroy(dialog);
 }
 
+void adjust_darea_size() {
+	sketch_width  = scale*(2*MP_BORDER + cairo_image_surface_get_width(mp_png));
+	sketch_height = scale*(2*MP_BORDER + cairo_image_surface_get_height(mp_png));
+	gtk_widget_set_size_request(darea, sketch_width, sketch_height);
+	y_offset = MP_BORDER*scale;
+	x_offset = -MP_BORDER*scale;
+	pixels_per_point = scale*density/INCH;
+	redraw_screen();
+}
+
 //rerun metapost, convert to png
 static gboolean refresh(gpointer window) {
 	int ret = create_mp_file(job_name,tmp_job_name);
@@ -108,15 +128,9 @@ static gboolean refresh(gpointer window) {
 		sprintf(png,"%s.png",tmp_job_name);
 		mp_png = cairo_image_surface_create_from_png(png);
 
-		//adjust the drawing area to the new size of the mp image
-		gtk_widget_set_size_request(
-			darea,
-			cairo_image_surface_get_width(mp_png) + 2*MP_BORDER,
-			cairo_image_surface_get_height(mp_png) + 2*MP_BORDER);
-		y_offset = -MP_BORDER - cairo_image_surface_get_height(mp_png) + win_height;
+		adjust_darea_size();
 	}
-	mode_change();
-	redraw_screen();
+	mode_change(); //replace info bar message
 	return FALSE;
 }
 
@@ -186,7 +200,15 @@ static gboolean on_draw_event(GtkWidget *widget, cairo_t *this_cr, gpointer user
 	}
 
 	if (mp_png) {
-		cairo_set_source_surface(cr, mp_png, MP_BORDER, MP_BORDER);
+		cairo_set_source_surface(cr, mp_png, MP_BORDER-1, MP_BORDER-1); //since adding the scrolled_window, it was off by 1
+
+		//scale it
+		cairo_pattern_t *pattern = cairo_get_source(cr);
+		cairo_matrix_t matrix;
+		cairo_pattern_get_matrix(pattern,&matrix);
+		cairo_matrix_scale(&matrix,1/scale,1/scale);
+		cairo_pattern_set_matrix(pattern,&matrix);
+
 		cairo_paint(cr);
 	}
 
@@ -221,11 +243,23 @@ void redraw_screen() {
 }
 
 static gboolean resize(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
-	gint width,height;
-	gtk_window_get_size(GTK_WINDOW(widget), &width, &height);
-	win_width = (unsigned int) width;
-	win_height = (unsigned int) height;
-	y_offset = -MP_BORDER - cairo_image_surface_get_height(mp_png) + win_height;
+	gtk_window_get_size(GTK_WINDOW(widget), &win_width, &win_height);
+	return FALSE;
+}
+
+//centre given mp coords in window
+void scroll_to(double x,double y) {
+	gtk_adjustment_set_value(hadj,mp_x_coord_to_pxl(x) - win_width/2);
+	gtk_adjustment_set_value(vadj,mp_y_coord_to_pxl(y) - win_height/2);
+}
+static gboolean scroll_to_origin() {
+	if (!mp_png || win_width == 0) return TRUE;
+	scroll_to(0,0);
+	return FALSE;
+}
+//when zooming in, we want the centre of the window to stay fixed
+static gboolean maintain_scroll(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
+	scroll_to(scroll_centre_x, scroll_centre_y);
 	return FALSE;
 }
 
@@ -252,6 +286,22 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 			case GDK_KEY_Return: //toggle cycle
 				cur_path->cycle = !cur_path->cycle;
 				redraw_screen();
+				break;
+			case GDK_KEY_Z: //zoom out
+				//remember where we want to scroll to
+				scroll_centre_x = pxl_to_mp_x_coord(gtk_adjustment_get_value(hadj) + win_width/2);
+				scroll_centre_y = pxl_to_mp_y_coord(gtk_adjustment_get_value(vadj) + win_height/2);
+
+				scale /= 1.5;
+				adjust_darea_size();
+				break;
+			case GDK_KEY_z: //zoom
+				//remember where we want to scroll to
+				scroll_centre_x = pxl_to_mp_x_coord(gtk_adjustment_get_value(hadj) + win_width/2);
+				scroll_centre_y = pxl_to_mp_y_coord(gtk_adjustment_get_value(vadj) + win_height/2);
+
+				scale *= 1.5;
+				adjust_darea_size();
 				break;
 			case GDK_KEY_i: //insert point before edit_point
 				if (edit) {
@@ -307,6 +357,7 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 				if (text != NULL) {
 					string_to_path(text);
 					finished_drawing = true;
+					if (cur_path->n != 0) scroll_to(cur_path->points[0].x,cur_path->points[0].y);
 					redraw_screen();
 				}
 				mode_change();
@@ -361,6 +412,7 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	gtk_container_add(GTK_CONTAINER(scrolled_window),darea);
 	gtk_box_pack_start(GTK_BOX(vbox), scrolled_window, TRUE, TRUE, 0);
 	g_signal_connect(G_OBJECT(darea), "draw", G_CALLBACK(on_draw_event), NULL);
+	g_signal_connect(darea, "size-allocate", G_CALLBACK(maintain_scroll), NULL);
 	GtkWidget *child = gtk_bin_get_child(GTK_BIN(scrolled_window));
 	hadj = gtk_scrollable_get_hadjustment(GTK_SCROLLABLE(child));
 	vadj = gtk_scrollable_get_vadjustment(GTK_SCROLLABLE(child));
@@ -373,7 +425,12 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	gtk_box_pack_end(GTK_BOX(vbox), info_bar, FALSE, TRUE, 0);
 
 	gtk_widget_show_all (window);
+	density = 100;
+	scale = 1;
+	pixels_per_point = scale*density/INCH;
 	refresh(window);
+
+	g_timeout_add(100,scroll_to_origin,window);
 }
 
 static void open(GApplication *app,

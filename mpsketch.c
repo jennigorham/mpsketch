@@ -92,13 +92,13 @@ void get_path_from_clipboard() {
 void box_msg(char *msg) {
 	int box_width = 250;
 	int box_height = 50;
-	int x = win_width/2 - box_width/2;
-	int y = win_height/2 - box_height/2;
+	int x = sketch_width/2 - box_width/2;
+	int y = sketch_height/2 - box_height/2;
 	XSetForeground(d,gc,WhitePixel(d, s));
 	XFillRectangle(d,w,gc,x,y,box_width,box_height);
 	XSetForeground(d,gc,BlackPixel(d, s));
 	XDrawRectangle(d,w,gc,x,y,box_width,box_height);
-	XDrawString(d, w, gc, x+10, win_height/2, msg, strlen(msg));
+	XDrawString(d, w, gc, x+10, sketch_height/2, msg, strlen(msg));
 	XFlush(d);
 }
 void error() {
@@ -215,6 +215,9 @@ int main(int argc, char **argv) {
 		}
 	coord_precision = ceil(log10(unit)); //choose a sensible number of decimal places for coordinates
 
+	density = 100;
+	pixels_per_point = density/INCH;
+
 	if (argc > optind) job_name = argv[optind];
 	else job_name = "test";
 	if (argc > optind+1) {
@@ -224,8 +227,8 @@ int main(int argc, char **argv) {
 
 	initialise();
 
-	win_width = 400;
-	win_height = 400;
+	sketch_width = 400;
+	sketch_height = 400;
 	
 	XEvent e;
 	
@@ -236,7 +239,7 @@ int main(int argc, char **argv) {
 	}
 	
 	s = DefaultScreen(d);
-	w = XCreateSimpleWindow(d, RootWindow(d, s), 0, 0, win_width, win_height, 1, BlackPixel(d, s), WhitePixel(d, s));
+	w = XCreateSimpleWindow(d, RootWindow(d, s), 0, 0, sketch_width, sketch_height, 1, BlackPixel(d, s), WhitePixel(d, s));
 
 	gc = DefaultGC(d,s);
 	XSelectInput(d, w, ExposureMask | KeyPressMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask); //Inputs we want to handle.
@@ -262,9 +265,9 @@ int main(int argc, char **argv) {
 		switch(e.type) {
 		case Expose: //on startup, and when window is resized, workspace switched
 			;Window rt; int x,y; unsigned int bw,dpth;
-			XGetGeometry(d,w,&rt,&x,&y,&win_width,&win_height,&bw,&dpth);
-			//x_offset = -ll_x/INCH*density - win_width/2;
-			//y_offset = ll_y/INCH*density + win_height/2;
+			XGetGeometry(d,w,&rt,&x,&y,&sketch_width,&sketch_height,&bw,&dpth);
+			//x_offset = -ll_x/INCH*density - sketch_width/2;
+			//y_offset = ll_y/INCH*density + sketch_height/2;
 			redraw_screen();
 			break;
 		case ButtonPress:
@@ -296,7 +299,7 @@ void show_msg(int pos,char *msg) {
 }
 void show_help() {
 	XSetForeground(d,gc,WhitePixel(d, s));
-	XFillRectangle(d,w,gc,0,0,win_width,win_height);
+	XFillRectangle(d,w,gc,0,0,sketch_width,sketch_height);
 	XSetForeground(d,gc,BlackPixel(d, s));
 	int pos = 1;
 	show_msg(pos++,"MPSketch: a MetaPost GUI");
@@ -388,6 +391,7 @@ void keypress(int keycode,int state) {
 	case 61://z - zoom
 		if (state & ShiftMask) density/=2; //shift-z zooms out
 		else density*=2;
+		pixels_per_point = density/INCH;
 		zoom();
 		break;
 	case 28://y - yank path string
@@ -532,7 +536,7 @@ void redraw_screen() {
 	} else {
 		//Clear the screen
 		XSetForeground(d,gc,WhitePixel(d, s));
-		XFillRectangle(d,w,gc,0,0,win_width,win_height);
+		XFillRectangle(d,w,gc,0,0,sketch_width,sketch_height);
 		XSetForeground(d,gc,BlackPixel(d, s));
 
 		//copy the bitmap to the screen
@@ -540,8 +544,8 @@ void redraw_screen() {
 			error();
 		} else {
 			XCopyPlane(d, bitmap, w, gc,
-				x_offset, y_offset + bitmap_height - win_height,
-				win_width, win_height,
+				x_offset, y_offset + bitmap_height - sketch_height,
+				sketch_width, sketch_height,
 				0, 0,
 				1);
 		}
@@ -549,7 +553,7 @@ void redraw_screen() {
 		if (show_trace) {
 			XCopyPlane(d, tracing_bitmap, w, gc,
 				trace_x_offset, trace_y_offset,
-				win_width, win_height,
+				sketch_width, sketch_height,
 				0, 0,
 				1);
 		}

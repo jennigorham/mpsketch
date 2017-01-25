@@ -24,7 +24,7 @@ void draw_path() {
 		double delta_x,delta_y, r;
 		delta_x = cur_path->points[0].x - cur_path->points[1].x;
 		delta_y = cur_path->points[0].y - cur_path->points[1].y;
-		r = sqrt(delta_x*delta_x + delta_y*delta_y) / INCH * density;
+		r = sqrt(delta_x*delta_x + delta_y*delta_y) * pixels_per_point;
 
 		draw_circle(cur_path->points[0].x,cur_path->points[0].y,(int) r);
 		draw_point(cur_path->points[0].x,cur_path->points[0].y);
@@ -34,16 +34,16 @@ void draw_path() {
 
 //Converting between metapost coords and pixels from upper left corner
 int mp_x_coord_to_pxl(double x) {
-	return round((x - ll_x)/INCH*density - x_offset);
+	return round((x - ll_x)*pixels_per_point - x_offset);
 }
 int mp_y_coord_to_pxl(double y) {
-	return round(win_height - y_offset - (y - ll_y)/INCH*density);
+	return round(sketch_height - y_offset - (y - ll_y)*pixels_per_point);
 }
 double pxl_to_mp_x_coord(int x) {
-	return ((x_offset + ((float) x))*INCH/density + ll_x);
+	return ((x_offset + ((float) x))/pixels_per_point + ll_x);
 }
 double pxl_to_mp_y_coord(int y) {
-	return ((-y_offset + win_height-((float) y))*INCH/density + ll_y);
+	return ((-y_offset + sketch_height-((float) y))/pixels_per_point + ll_y);
 }
 
 void output_path() {
@@ -161,7 +161,6 @@ void pointer_move(int x,int y) {
 }
 
 void initialise() {
-	density = 100;
 	finished_drawing=true;
 	mode = CURVE_MODE;
 	edit=false;

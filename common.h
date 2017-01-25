@@ -32,8 +32,11 @@ bool finished_drawing; //if true then we're ready to start drawing another path 
 int x_offset;
 int y_offset;
 
-unsigned int win_height;
-unsigned int win_width;
+double pixels_per_point;
+
+//width/height of the drawing area
+unsigned int sketch_height;
+unsigned int sketch_width;
 
 //Converting between metapost coords and pixels from upper left corner
 int mp_x_coord_to_pxl(double x);
