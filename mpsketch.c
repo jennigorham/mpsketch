@@ -386,11 +386,7 @@ void keypress(int keycode,int state) {
 		refresh();
 		break;
 	case 41://u - undo creating a point
-		if (!finished_drawing && cur_path->n > 0) {
-			cur_path->n--;
-			if (cur_path->n == 0) finished_drawing = true;
-			redraw_screen();
-		}
+		undo();
 		break;
 	case 61://z - zoom
 		if (state & ShiftMask) density/=2; //shift-z zooms out

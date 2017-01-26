@@ -56,6 +56,7 @@ void end_path();
 
 void click_point(int x, int y); //when the user clicks to add a point to the path, or create a circle
 void pointer_move(int x,int y);
+void undo(); //undo creating a point
 
 void initialise();
 void cleanup();

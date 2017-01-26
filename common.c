@@ -160,6 +160,14 @@ void pointer_move(int x,int y) {
 	}
 }
 
+void undo() {//undo creating a point
+	if (!finished_drawing && cur_path->n > 0) {
+		cur_path->n--;
+		if (cur_path->n == 0) finished_drawing = true;
+		redraw_screen();
+	}
+}
+
 void initialise() {
 	finished_drawing=true;
 	mode = CURVE_MODE;

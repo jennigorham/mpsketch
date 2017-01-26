@@ -9,7 +9,6 @@
 TODO:
 corner mode
 move trace
-u = undo last point
 custom precision
 check for find_control_points() failure?
 
@@ -110,6 +109,7 @@ void show_help(gpointer window) {
 
 			"\nDrawing paths and circles:\n"
 			"'.' = curve mode, '-' = straight line mode, c = circle mode\n"
+			"u = undo creating last point\n"
 			"Escape = end path, Enter = end path and make a cycle\n"
 
 			"\nEdit mode (mouse over a point on a path):\n"
@@ -385,6 +385,9 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 					redraw_screen();
 					mode_change();
 				}
+				break;
+			case GDK_KEY_u: //undo last point
+				undo();
 				break;
 			case GDK_KEY_t: //toggle trace visibility
 				show_trace = !show_trace;
