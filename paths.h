@@ -15,15 +15,18 @@ char *unit_name; //might want it to write coords in terms of a variable, eg "(5u
 double unit; //default unit in postscript points
 
 struct point {
-	double x,y,left_x,left_y,right_x,right_y;
+	double x,y;
+	double left_x,left_y,right_x,right_y; //bezier control points
 	bool straight; //should the section after this point be straight
 };
+
 struct path {
 	struct point *points;
 	int n; //number of points
 	size_t size; //number of points we've allocated space for
-	bool cycle;
+	bool cycle; //last point connects to first point
 };
+//path can also store a circle by setting n=-1, points[0] = centre of the circle, points[1] = a point on the circumference
 
 struct path *cur_path; //current path
 
@@ -31,8 +34,15 @@ unsigned int coord_precision; //number of decimal places for printing coordinate
 
 void init_path(struct path *p);
 
-double string_to_bp(char *s,bool *valid); //return number of postscript points (aka big points, bp) from strings like 'cm', '5.2in', etc
-void string_to_path(char *buffer); //get path from string
+//return number of postscript points (aka big points, bp) from strings like 'cm', '5.2in', etc
+double string_to_bp(char *s,bool *valid);
+
+//parse something like "(5cm,-3cm)". Returns pointer to next character after valid point string
+char *string_to_point(char *s, double *x, double *y);
+
+//Get a path from a string (store in cur_path). Returns pointer to next char after valid path string
+char *string_to_path(char *buffer);
+
 char *path_to_string(); //return the string defining the path
 
 void find_control_points(); //find metapost's bezier control points for the path

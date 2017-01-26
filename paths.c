@@ -37,37 +37,85 @@ double string_to_bp(char *s,bool *valid) {
 	return bp;
 }
 
-//get a path from a string. Experimental, currently does no checking
-void string_to_path(char *s) {
-	//TODO: use strtok http://en.cppreference.com/w/c/string/byte/strtok
-	int i=1;
-	int j=i;
+//parse something like "(5cm,-3cm)". Returns pointer to next character after valid point string
+char *string_to_point(char *s, double *x, double *y) {
+	//check that it starts with '(' and has a comma
+	if (*s != '(') return s;
+	char *comma = strchr(s+1,',');
+	if (comma == NULL) return s;
+
+	//get x coord
+	*comma = '\0'; //mark end of first coord
+	bool valid;
+	*x = string_to_bp(s+1,&valid);
+	if (!valid) return s;
+
+	//check for closing bracket
+	char *bracket = strchr(comma+1,')');
+	if (bracket == NULL) return s;
+
+	//get y coord
+	*bracket = '\0'; //mark end of 2nd coord
+	*y = string_to_bp(comma+1,&valid);
+	if (!valid) return s;
+
+	return bracket + 1;
+}
+
+//Get a path from a string (store in cur_path). Returns pointer to next char after valid path string
+char *string_to_path(char *s) {
+	char *end;
 	double x,y;
 	cur_path->n = 0;
 	cur_path->cycle = false;
-	int l = strlen(s);
-	while (true) {
-		while (j<l-1 && s[j] != ',') j++;
-		s[j] = '\0';
-		x = string_to_bp(s+i,NULL);
 
-		i=j+1;
-		if (i >= l) break;
-		while (j<l-1 && s[j] != ')') j++;
-		s[j] = '\0';
-		y = string_to_bp(s+i,NULL);
+	//check for circle strings, eg "fullcircle scaled 2cm shifted (-1cm,1cm)"
+	char *substring = "fullcircle scaled ";
+	if (strncmp(s,substring,strlen(substring)) == 0) {
+		//find the radius
+		char *diameter = s + strlen(substring);
+		char *space = strchr(diameter,' ');
+		if (space == NULL) return s;
+		*space = '\0'; //mark end of diameter string
+		bool valid;
+		double r = string_to_bp(diameter,&valid) / 2;
+		if (!valid) return s;
 
-		append_point(x,y,false);
+		//find the centre
+		substring = "shifted ";
+		if (strncmp(space+1,substring,strlen(substring)) != 0) return s;
+		char *centre = space + strlen(substring) + 1; //start of centre point coords
+		end = string_to_point(centre,&x,&y);
+		if (end == centre) //invalid point
+			return s;
 
-		if (j+1>=l || s[j+1] == '\0') break;
-		set_last_straight(s[j+1] != '.');
-		i = j+4;
-		if (i>=l) break;
-		if (s[i] == 'y') {
-			cur_path->cycle = true;
-			break;
+		append_point(x,y,false); //centre
+		append_point(x+r,y,false); //a point on the circumference
+		cur_path->n = -1; //signifies a circle
+		return end;
+	} else {
+		/*Examples of valid paths:
+		curved, closed path in cm: "(1cm,2cm)..(0,1cm)..(-1.1cm,0.5cm)..cycle"
+		straight path in custom units: "(-0.36u,0.85u)--(-0.92u,-1.43u)--(1.29u,0.52u)"
+		pacman: "(30,-33)..(-21,-7)..(32,10)--(11,-13)--cycle"
+		*/
+		while (true) {
+			end = string_to_point(s,&x,&y);
+			if (end == s) //invalid point
+				return s;
+			append_point(x,y, *end == '-');
+
+			if (strlen(end) < 5) //not enough chars for another point
+				break;
+			s = end + 2; //go to next point
+			if (strcmp(s,"cycle") == 0) {
+				cur_path->cycle = true;
+				end = s+5;
+				break;
+			}
 		}
 	}
+	return end;
 }
 
 //find the bezier control points for all the points on the path

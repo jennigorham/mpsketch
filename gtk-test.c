@@ -10,7 +10,6 @@ TODO:
 corner mode
 move trace
 u = undo last point
-keybindings dialog
 custom precision
 check for find_control_points() failure?
 
@@ -67,7 +66,7 @@ gchar *get_info_msg() {
 			else if (mode == STRAIGHT_MODE)
 				return "Click to start drawing straight lines. Press '.' for curve mode, 'c' for circle mode, 'h' to show help.";
 			else if (mode == CIRCLE_MODE)
-				return "Click to start drawing circle. Press '-' for straight line mode, '.' for curve mode, 'h' to show help.";
+				return "Click to start drawing a circle. Press '-' for straight line mode, '.' for curve mode, 'h' to show help.";
 		}
 	} else {
 		if (mode == CURVE_MODE)

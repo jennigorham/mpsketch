@@ -11,7 +11,6 @@
 
 /*
 TODO: 
-string_to_path for circles
 take jobname.mp as first arg, rather than jobname
 do spaces in jobname stuff up the xbm?
 include instructions on how to get mplib in README
