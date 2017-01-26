@@ -32,7 +32,6 @@ GtkAdjustment *vadj;
 
 gint win_width,win_height;
 
-
 //mp coords of centre of window
 double scroll_centre_x;
 double scroll_centre_y;
@@ -258,12 +257,23 @@ static gboolean button_press(GtkWidget *widget, GdkEventButton *event, gpointer 
 	return FALSE;
 }
 
+//translate event->x and y to drawing area coords
+void darea_coords(gdouble wx, gdouble wy, int *x, int *y) {
+	//compensate for scrollbar position
+	*x = wx + gtk_adjustment_get_value(hadj);
+	*y = wy + gtk_adjustment_get_value(vadj);
+
+	//compensate for menubar
+	GtkAllocation alloc;
+	gtk_widget_get_allocation(scrolled_window, &alloc);
+	*y-=alloc.y;
+}
 static gboolean button_release(GtkWidget *widget, GdkEventButton *event, gpointer user_data) {
-	double x,y;
-	x = event->x + gtk_adjustment_get_value(hadj);
-	y = event->y + gtk_adjustment_get_value(vadj);
-	if (event->button == 1) 
+	if (event->button == 1) {
+		int x,y;
+		darea_coords(event->x,event->y,&x,&y);
 		click_point(x,y);
+	}
 	return FALSE;
 }
 
@@ -440,13 +450,10 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 
 	return FALSE;
 }
+
 static gboolean on_motion(GtkWidget *widget, GdkEventMotion *event, gpointer user_data) {
 	int x, y;
-	GdkModifierType state;
-	GdkDevice *device=gdk_event_get_source_device((GdkEvent *)event);
-	gdk_window_get_device_position(event->window,device,&x,&y,&state);
-	x += gtk_adjustment_get_value(hadj);
-	y += gtk_adjustment_get_value(vadj);
+	darea_coords(event->x,event->y,&x,&y);
 	pointer_move(x,y);
 	return FALSE;
 }
@@ -462,7 +469,6 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	window = gtk_application_window_new (app);
 	gtk_window_set_title (GTK_WINDOW (window), "MPSketch");
 	gtk_window_set_default_size (GTK_WINDOW (window), 200, 200);
-	x_offset = -MP_BORDER;
 	gtk_widget_add_events(window, GDK_BUTTON_PRESS_MASK);
 	gtk_widget_add_events(window, GDK_POINTER_MOTION_MASK);
 	gtk_widget_add_events(window, GDK_BUTTON_RELEASE_MASK);
@@ -475,6 +481,17 @@ static void activate (GtkApplication* app, gpointer user_data) {
 
 	GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	gtk_container_add(GTK_CONTAINER(window), vbox);
+
+	//menus
+	GtkWidget *menubar = gtk_menu_bar_new();
+	GtkWidget *file_menu = gtk_menu_new();
+	GtkWidget *file_mi = gtk_menu_item_new_with_label("File");
+	GtkWidget *quit_mi = gtk_menu_item_new_with_label("Quit");
+	gtk_menu_item_set_submenu(GTK_MENU_ITEM(file_mi), file_menu);
+	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), quit_mi);
+	gtk_menu_shell_append(GTK_MENU_SHELL(menubar), file_mi);
+	gtk_box_pack_start(GTK_BOX(vbox), menubar, FALSE, FALSE, 0);
+	g_signal_connect_swapped(G_OBJECT(quit_mi), "activate", G_CALLBACK (g_application_quit), G_APPLICATION(app));
 
 	scrolled_window = gtk_scrolled_window_new (NULL, NULL);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolled_window),
