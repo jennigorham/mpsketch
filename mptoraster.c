@@ -78,30 +78,36 @@ int get_coords(char *job_name) {
 		fprintf(stderr,"ERROR: couldn't open '%s.log'.\n",job_name);
 		return 1;
 	} else {
-		char substring[50];
-		sprintf(substring,">> \"Figure %d coordinates: ",fig_num);
-
+		char *substring = ">> \"Figure ";
+		n_fig = 0;
 		while (fgets(buffer,sizeof(buffer),log) != NULL) {
 			if (strncmp(buffer,substring,strlen(substring)) == 0) {
-				//get x-coord
-				char *x = buffer + strlen(substring) + 1;
-				char *comma = strchr(x,',');
-				if (comma == NULL) break;
-				*comma = '\0';
+				//make a record that this figure number is available
+				char *num = buffer + strlen(substring);
+				char *space;
+				figures[n_fig] = strtod(num,&space);
+				n_fig++;
 
-				//get y-coord
-				char *y = comma + 1;
-				char *bracket = strchr(y,')');
-				if (bracket == NULL) break;
-				*bracket = '\0';
+				if (figures[n_fig-1] == fig_num) {
+					//get x-coord
+					char *x = space + strlen("coordinates: (") + 1;
+					char *comma = strchr(x,',');
+					if (comma == NULL) continue;
+					*comma = '\0';
 
-				ll_x = strtof(x,NULL);
-				ll_y = strtof(y,NULL);
+					//get y-coord
+					char *y = comma + 1;
+					char *bracket = strchr(y,')');
+					if (bracket == NULL) continue;
+					*bracket = '\0';
 
-				if (!USE_MPTOPDF) ll_y -= 0.8; //The vertical coordinate seems to be off by about 0.8pt when using mpost. I don't know why. 
+					ll_x = strtof(x,NULL);
+					ll_y = strtof(y,NULL);
 
-				found_coords = true;
-				break;
+					if (!USE_MPTOPDF) ll_y -= 0.8; //The vertical coordinate seems to be off by about 0.8pt when using mpost. I don't know why. 
+
+					found_coords = true;
+				}
 			}
 		}
 		fclose(log);

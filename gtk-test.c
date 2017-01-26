@@ -100,6 +100,7 @@ void show_help(gpointer window) {
 			GTK_MESSAGE_INFO,
 			GTK_BUTTONS_OK,
 			"r = rerun metapost\n"
+			"f = change figure number\n"
 			//"t = toggle trace visibility\n"
 			"z = zoom in, shift-z = zoom out\n"
 			"p or ctrl-v = paste path from clipboard\n"
@@ -133,16 +134,9 @@ void adjust_darea_size() {
 	redraw_screen();
 }
 
-//rerun metapost, convert to png
-static gboolean refresh(gpointer window) {
-	int ret = create_mp_file(job_name,tmp_job_name);
-	if (ret == 1) 
-		show_error(window,"Couldn't open %s.mp",job_name);
-	else if (ret == 2)
-		show_error(window,"Couldn't open %s.mp for writing",tmp_job_name);
-	else if (run_mpost(tmp_job_name) != 0) {
-		show_error(window,"%s","Error running metapost. See stdout for more details.");
-	} else if ((ret = get_coords(tmp_job_name)) != 0) {
+void get_figure(gpointer window) {
+	int ret = get_coords(tmp_job_name);
+	if (ret != 0) {
 		if (ret == 1) show_error(window,"Couldn't open %s.log.",tmp_job_name);
 		else if (ret == 2) {
 			char s[10];
@@ -158,6 +152,53 @@ static gboolean refresh(gpointer window) {
 
 		adjust_darea_size();
 	}
+}
+
+void select_figure(gpointer window) {
+	GtkWidget *dialog, *content_area, *combo;
+
+	dialog = gtk_dialog_new_with_buttons("Figure",window,GTK_DIALOG_DESTROY_WITH_PARENT,"OK",GTK_RESPONSE_NONE,NULL);
+	content_area = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
+
+	combo = gtk_combo_box_text_new();
+	gtk_container_add( GTK_CONTAINER( content_area ), combo );
+	int i;
+	int index; //index of current figure
+	for (i=0; i<n_fig; i++) {
+		char entry[10];
+		snprintf(entry,sizeof(entry),"Figure %d",figures[i]);
+		if (figures[i] == fig_num) index = i;
+		gtk_combo_box_text_append_text( GTK_COMBO_BOX_TEXT( combo ), entry );
+	}
+	gtk_combo_box_set_active(GTK_COMBO_BOX(combo),index);
+	gtk_widget_show(combo);
+
+	gtk_dialog_run(GTK_DIALOG(dialog));
+
+	gchar *fig = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT( combo ));
+	if (fig) {
+		fig_num = atoi(fig + strlen("Figure "));
+		g_free(fig);
+	}
+	gtk_widget_destroy(dialog);
+
+	//scroll to origin
+	scroll_centre_x = 0;
+	scroll_centre_y = 0;
+	//create and load in the png
+	get_figure(window);
+}
+
+//rerun metapost, convert to png
+static gboolean refresh(gpointer window) {
+	int ret = create_mp_file(job_name,tmp_job_name);
+	if (ret == 1) 
+		show_error(window,"Couldn't open %s.mp",job_name);
+	else if (ret == 2)
+		show_error(window,"Couldn't open %s.mp for writing",tmp_job_name);
+	else if (run_mpost(tmp_job_name) != 0) {
+		show_error(window,"%s","Error running metapost. See stdout for more details.");
+	} else get_figure(window);
 	mode_change(); //replace info bar message
 	return FALSE;
 }
@@ -374,6 +415,9 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 				scale *= 1.5;
 				adjust_darea_size();
 				break;
+			case GDK_KEY_f: 
+				select_figure(widget);
+				break;
 			case GDK_KEY_i: //insert point before edit_point
 				if (edit) {
 					point_before(edit_point);
@@ -487,10 +531,16 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	GtkWidget *file_menu = gtk_menu_new();
 	GtkWidget *file_mi = gtk_menu_item_new_with_label("File");
 	GtkWidget *quit_mi = gtk_menu_item_new_with_label("Quit");
+	GtkWidget *fig_mi = gtk_menu_item_new_with_label("Change figure");
 	gtk_menu_item_set_submenu(GTK_MENU_ITEM(file_mi), file_menu);
+
+	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), fig_mi);
 	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), quit_mi);
+
 	gtk_menu_shell_append(GTK_MENU_SHELL(menubar), file_mi);
 	gtk_box_pack_start(GTK_BOX(vbox), menubar, FALSE, FALSE, 0);
+
+	g_signal_connect_swapped(G_OBJECT(fig_mi), "activate", G_CALLBACK (select_figure), window);
 	g_signal_connect_swapped(G_OBJECT(quit_mi), "activate", G_CALLBACK (g_application_quit), G_APPLICATION(app));
 
 	scrolled_window = gtk_scrolled_window_new (NULL, NULL);

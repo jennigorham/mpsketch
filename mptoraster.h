@@ -16,6 +16,9 @@ float ll_y;
 
 unsigned int fig_num; //metapost figure number (the "1" in "beginfig(1)" for example)
 
+int figures[20]; //available figures
+int n_fig; //number of figures
+
 int density; //points per inch for bitmap. changes when we zoom in
 
 //create a new mp file from the original, with commands added to save the coords and override outputtemplate and prologues
