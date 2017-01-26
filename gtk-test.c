@@ -47,24 +47,27 @@ gchar *get_info_msg() {
 	if (finished_drawing) {
 		if (edit) {
 			if (cur_path->n == -1) {
-				return "Click and drag point. Then press 'y' to yank the new circle.";
+				return "Click and drag point. Then press 'y' to copy the new circle.";
 			} else if (cur_path-> n == 1) {
-				return "Click and drag point. Then press 'y' to yank the new coordinates.";
+				return "Click and drag point. Then press 'y' to copy the new coordinates.";
 			} else {
 				if (!cur_path->cycle && edit_point == cur_path->n - 1) { //can't change to curve/straight since there's nothing after last point
-					return "Click and drag point to move. Then press 'y' to yank path.\n'd' = delete. 'a'/'i' = append/insert point. Enter = toggle cycle.";
+					return "Click and drag point to move. Then press 'y' to copy path.\n"
+						"'d' = delete. 'a'/'i' = append/insert point. Enter = toggle cycle.";
 				} else if (cur_path->points[edit_point].straight)
-					return "Click and drag point to move. Then press 'y' to yank path.\n'.' = curve. 'd' = delete. 'a'/'i' = append/insert point. Enter = toggle cycle.";
+					return "Click and drag point to move. Then press 'y' to copy path.\n"
+						"'.' = curve. 'd' = delete. 'a'/'i' = append/insert point. Enter = toggle cycle.";
 				else
-					return "Click and drag point to move. Then press 'y' to yank path.\n'-' = straight. 'd' = delete. 'a'/'i' = append/insert point. Enter = toggle cycle.";
+					return "Click and drag point to move. Then press 'y' to copy path.\n"
+						"'-' = straight. 'd' = delete. 'a'/'i' = append/insert point. Enter = toggle cycle.";
 			}
 		} else {
 			if (mode == CURVE_MODE)
-				return "Click to start drawing a curve. Press '-' for straight line mode, 'c' for circle mode.";
+				return "Click to start drawing a curve. Press '-' for straight line mode, 'c' for circle mode, 'h' to show help.";
 			else if (mode == STRAIGHT_MODE)
-				return "Click to start drawing straight lines. Press '.' for curve mode, 'c' for circle mode.";
+				return "Click to start drawing straight lines. Press '.' for curve mode, 'c' for circle mode, 'h' to show help.";
 			else if (mode == CIRCLE_MODE)
-				return "Click to start drawing circle. Press '-' for straight line mode, '.' for curve mode.";
+				return "Click to start drawing circle. Press '-' for straight line mode, '.' for curve mode, 'h' to show help.";
 		}
 	} else {
 		if (mode == CURVE_MODE)
@@ -89,6 +92,35 @@ void show_error(gpointer window,char *fmt,char *msg) {//http://zetcode.com/gui/g
 			GTK_BUTTONS_OK,
 			fmt,msg);
 	gtk_window_set_title(GTK_WINDOW(dialog), "Error");
+	gtk_dialog_run(GTK_DIALOG(dialog));
+	gtk_widget_destroy(dialog);
+}
+
+void show_help(gpointer window) {
+	GtkWidget *dialog;
+	dialog = gtk_message_dialog_new(GTK_WINDOW(window),
+			GTK_DIALOG_DESTROY_WITH_PARENT,
+			GTK_MESSAGE_INFO,
+			GTK_BUTTONS_OK,
+			"r = rerun metapost\n"
+			//"t = toggle trace visibility\n"
+			"z = zoom in, shift-z = zoom out\n"
+			"p or ctrl-v = paste path from clipboard\n"
+			"h or ? = show this help dialog\n"
+			"q = quit\n"
+
+			"\nDrawing paths and circles:\n"
+			"'.' = curve mode, '-' = straight line mode, c = circle mode\n"
+			"Escape = end path, Enter = end path and make a cycle\n"
+
+			"\nEdit mode (mouse over a point on a path):\n"
+			"d = delete point\n"
+			"a = append point (after current point), i = insert point (before current point)\n"
+			"'.' = make following section curved, '-' = make following section straight\n"
+			"Enter = toggle cycle\n"
+			"After editing, press y or ctrl-c to copy path to clipboard\n"
+			);
+	gtk_window_set_title(GTK_WINDOW(dialog), "Keybindings");
 	gtk_dialog_run(GTK_DIALOG(dialog));
 	gtk_widget_destroy(dialog);
 }
@@ -311,6 +343,11 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 					cur_path->cycle = !cur_path->cycle;
 					redraw_screen();
 				}
+				break;
+			//help
+			case GDK_KEY_question:
+			case GDK_KEY_h:
+				show_help(GTK_WINDOW(widget));
 				break;
 			case GDK_KEY_Z: //zoom out
 				//remember where we want to scroll to
