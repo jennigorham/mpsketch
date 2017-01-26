@@ -107,7 +107,7 @@ void click_point(int x, int y) {
 }
 
 void end_path() {
-	if (mode == CIRCLE_MODE) cur_path->n = -1;
+	cur_path->n--; //remove extra point under cursor. If circle, makes n=-1
 	output_path();
 	finished_drawing=true;
 	redraw_screen();

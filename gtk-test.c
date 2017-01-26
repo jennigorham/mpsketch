@@ -13,7 +13,6 @@ u = undo last point
 keybindings dialog
 custom precision
 check for find_control_points() failure?
-can't drawdot now that Esc behaviour changed
 
 desktop file, mime type https://developer.gnome.org/integration-guide/stable/desktop-files.html.en and https://developer.gnome.org/integration-guide/stable/mime.html.en
 tabs for different figures? http://www.cc.gatech.edu/data_files/public/doc/gtk/tutorial/gtk_tut-8.html
@@ -69,9 +68,9 @@ gchar *get_info_msg() {
 		}
 	} else {
 		if (mode == CURVE_MODE)
-			return "Click to add point. Escape = end path. Enter = toggle cycle. '-' = straight line mode.";
+			return "Click to add point. Escape = end path. Enter = make cycle. '-' = straight line mode.";
 		else if (mode == STRAIGHT_MODE)
-			return "Click to add point. Escape = end path. Enter = toggle cycle. '.' = curve mode.";
+			return "Click to add point. Escape = end path. Enter = make cycle. '.' = curve mode.";
 		else if (mode == CIRCLE_MODE)
 			return "Click to end circle.";
 	}
@@ -304,9 +303,14 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 				} else
 					end_path();
 				break;
-			case GDK_KEY_Return: //toggle cycle
-				cur_path->cycle = !cur_path->cycle;
-				redraw_screen();
+			case GDK_KEY_Return: //cycle
+				if (!finished_drawing) {
+					cur_path->cycle = true;
+					end_path();
+				} else if (edit) {
+					cur_path->cycle = !cur_path->cycle;
+					redraw_screen();
+				}
 				break;
 			case GDK_KEY_Z: //zoom out
 				//remember where we want to scroll to

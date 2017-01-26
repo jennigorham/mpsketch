@@ -346,8 +346,13 @@ void keypress(int keycode,int state) {
 			end_path();
 		break;
 	case 36://Return
-		cur_path->cycle = !cur_path->cycle;
-		redraw_screen();
+		if (!finished_drawing) {
+			cur_path->cycle = true;
+			end_path();
+		} else if (edit) {
+			cur_path->cycle = !cur_path->cycle;
+			redraw_screen();
+		}
 		break;
 	case 43://d - delete a point
 		if (edit) {
