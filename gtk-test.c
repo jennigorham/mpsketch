@@ -366,12 +366,16 @@ void push_path() {
 	if (text != NULL) {
 		string_to_path(text);
 		finished_drawing = true;
-		struct point fp = cur_path->points[0]; //first point
-		if (cur_path->n != 0 && is_off_screen(fp.x,fp.y))
-			scroll_to(fp.x,fp.y);
-		redraw_screen();
+		if (cur_path->n == 0) {
+			gtk_label_set_text (GTK_LABEL (message_label), "Invalid path");
+		} else {
+			struct point fp = cur_path->points[0]; //first point
+			if (is_off_screen(fp.x,fp.y))
+				scroll_to(fp.x,fp.y);
+			redraw_screen();
+			mode_change();
+		}
 	}
-	mode_change();
 }
 
 static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
