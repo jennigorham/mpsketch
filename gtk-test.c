@@ -2,6 +2,7 @@
 #include <gdk/gdkkeysyms.h>
 
 #include "common.h"
+#include <libgen.h> //dirname
 
 #define MP_BORDER 200 //extra space around the mp png
 
@@ -142,6 +143,13 @@ void open_dialog(GtkWidget *window) {
 	if (res == GTK_RESPONSE_ACCEPT) {
 		g_free(mp_filename);
 		mp_filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER (dialog));
+
+		//change to the directory containing mp_filename so that mpost doesn't fail if they input a local file
+		char dir[strlen(mp_filename)+1]; //need to copy the mp_filename string because dirname may alter it
+		strcpy(dir,mp_filename);
+		rm_tmp(); //get rid of any temporary files we may have created in current directory
+		chdir(dirname(dir)); //POSIX only. Use _splitpath_s if porting to windows (http://stackoverflow.com/questions/21229214/how-to-get-the-directory-of-a-file-from-the-full-path-in-c)
+
 		gtk_label_set_text (GTK_LABEL (message_label), "Running metapost...");
 		g_idle_add(refresh,GTK_WINDOW(window));
 	}

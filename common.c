@@ -189,16 +189,19 @@ void initialise() {
 		}
 	}
 }
+void rm_tmp() {
+	//Get rid of temporary files. Not portable, but it's the easiest way for now
+	if (*tmp_job_name != '\0') {
+		char cmd[6 + strlen(tmp_job_name)];
+		sprintf(cmd,"rm -f %s.*",tmp_job_name);
+		system(cmd);
+	}
+}
 void cleanup() {
 	if (cur_path) {
 		if (cur_path->points) free(cur_path->points);
 		free(cur_path);
 	}
 
-	//Get rid of temporary files. Not portable, but it's the easiest way for now
-	if (*tmp_job_name != '\0') {
-		char cmd[6 + strlen(tmp_job_name)];
-		sprintf(cmd,"rm %s.*",tmp_job_name);
-		system(cmd);
-	}
+	rm_tmp();
 }

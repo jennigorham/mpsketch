@@ -60,6 +60,7 @@ void undo(); //undo creating a point
 
 void initialise();
 void cleanup();
+void rm_tmp(); //remove temporary files
 
 //defined in mpsketch.c or gtk-test.c
 void draw_circle(double centre_x, double centre_y, int r);
