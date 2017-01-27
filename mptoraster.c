@@ -6,7 +6,7 @@ int run_mpost(char *job_name) {
 	if (USE_MPTOPDF)
 		sprintf(cmd,"mptopdf %s.mp",job_name);
 	else
-		sprintf(cmd,"mpost --halt-on-error %s.mp",job_name);
+		sprintf(cmd,"mpost --interaction=nonstopmode %s.mp",job_name);
 		//sprintf(cmd,"mpost --interaction=nonstopmode %s.mp",job_name);
 	printf("\nRunning \"%s\"...\n",cmd);
 	return system(cmd);

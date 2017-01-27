@@ -80,7 +80,10 @@ gchar *get_info_msg() {
 }
 
 void mode_change() {
-	gtk_label_set_text (GTK_LABEL (message_label), get_info_msg());
+	char *msg = get_info_msg();
+	char s[strlen(msg) + 10];
+	snprintf(s,sizeof(s),"Fig%d | %s",fig_num,msg);
+	gtk_label_set_text (GTK_LABEL (message_label), s);
 }
 
 void show_error(gpointer window,char *fmt,char *msg) {//http://zetcode.com/gui/gtk2/gtkdialogs/
@@ -211,6 +214,26 @@ void select_figure(gpointer window) {
 	scroll_centre_y = 0;
 	//create and load in the png
 	get_figure(window);
+	mode_change();
+}
+
+//return index of current figure in list of available figures, or return index of last figure if not found
+int get_fig_index() {
+	int i;
+	for (i=0;i<n_fig;i++) {
+		if (figures[i] == fig_num) break;
+	}
+	return i;
+}
+void next_fig(gpointer window) {
+	fig_num = figures[(get_fig_index() + 1)%n_fig];
+	get_figure(window);
+	mode_change();
+}
+void prev_fig(gpointer window) {
+	fig_num = figures[(get_fig_index() + n_fig - 1)%n_fig];
+	get_figure(window);
+	mode_change();
 }
 
 //rerun metapost, convert to png
@@ -542,6 +565,16 @@ static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox)
 	g_signal_connect_swapped(G_OBJECT(fig_mi), "activate", G_CALLBACK (select_figure), window);
 	gtk_widget_add_accelerator(fig_mi, "activate", accel_group, GDK_KEY_f, 0, GTK_ACCEL_VISIBLE);
 
+	GtkWidget *next_fig_mi = gtk_menu_item_new_with_label("Next figure");
+	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), next_fig_mi);
+	g_signal_connect_swapped(G_OBJECT(next_fig_mi), "activate", G_CALLBACK (next_fig),window);
+	gtk_widget_add_accelerator(next_fig_mi, "activate", accel_group, GDK_KEY_Page_Down, 0, GTK_ACCEL_VISIBLE);
+
+	GtkWidget *prev_fig_mi = gtk_menu_item_new_with_label("Previous figure");
+	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), prev_fig_mi);
+	g_signal_connect_swapped(G_OBJECT(prev_fig_mi), "activate", G_CALLBACK (prev_fig),window);
+	gtk_widget_add_accelerator(prev_fig_mi, "activate", accel_group, GDK_KEY_Page_Up, 0, GTK_ACCEL_VISIBLE);
+
 	GtkWidget *help_mi = gtk_menu_item_new_with_label("Help");
 	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), help_mi);
 	g_signal_connect_swapped(G_OBJECT(help_mi), "activate", G_CALLBACK (show_help), window);
@@ -672,7 +705,7 @@ int main (int argc, char **argv) {
 	GtkApplication *app;
 	int status;
 
-	app = gtk_application_new ("com.github.jennigorham.mpsketch", G_APPLICATION_HANDLES_OPEN);
+	app = gtk_application_new (NULL, G_APPLICATION_HANDLES_OPEN);
 	g_application_add_main_option_entries(G_APPLICATION(app),entries);
 	g_signal_connect (app, "activate", G_CALLBACK (activate), NULL);
 	g_signal_connect (app, "open", G_CALLBACK (open), NULL);
