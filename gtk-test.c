@@ -534,18 +534,22 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	GtkWidget *menubar = gtk_menu_bar_new();
 	GtkWidget *file_menu = gtk_menu_new();
 	GtkWidget *file_mi = gtk_menu_item_new_with_label("File");
-	GtkWidget *quit_mi = gtk_menu_item_new_with_label("Quit");
-	GtkWidget *fig_mi = gtk_menu_item_new_with_label("Change figure");
 	gtk_menu_item_set_submenu(GTK_MENU_ITEM(file_mi), file_menu);
 
+	GtkWidget *fig_mi = gtk_menu_item_new_with_label("Change figure");
 	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), fig_mi);
+	g_signal_connect_swapped(G_OBJECT(fig_mi), "activate", G_CALLBACK (select_figure), window);
+
+	GtkWidget *help_mi = gtk_menu_item_new_with_label("Help");
+	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), help_mi);
+	g_signal_connect_swapped(G_OBJECT(help_mi), "activate", G_CALLBACK (show_help), window);
+
+	GtkWidget *quit_mi = gtk_menu_item_new_with_label("Quit");
 	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), quit_mi);
+	g_signal_connect_swapped(G_OBJECT(quit_mi), "activate", G_CALLBACK (g_application_quit), G_APPLICATION(app));
 
 	gtk_menu_shell_append(GTK_MENU_SHELL(menubar), file_mi);
 	gtk_box_pack_start(GTK_BOX(vbox), menubar, FALSE, FALSE, 0);
-
-	g_signal_connect_swapped(G_OBJECT(fig_mi), "activate", G_CALLBACK (select_figure), window);
-	g_signal_connect_swapped(G_OBJECT(quit_mi), "activate", G_CALLBACK (g_application_quit), G_APPLICATION(app));
 
 	scrolled_window = gtk_scrolled_window_new (NULL, NULL);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolled_window),
