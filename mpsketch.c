@@ -11,7 +11,6 @@
 
 /*
 TODO: 
-take jobname.mp as first arg, rather than jobname
 do spaces in jobname stuff up the xbm?
 include instructions on how to get mplib in README
 	also link to mpman: https://www.tug.org/docs/metapost/mpman.pdf
@@ -217,12 +216,11 @@ int main(int argc, char **argv) {
 	density = 100;
 	pixels_per_point = density/INCH;
 
-	if (argc > optind) job_name = argv[optind];
-	else job_name = "test";
+	if (argc > optind) mp_filename = argv[optind];
+	else mp_filename = "test.mp";
 	if (argc > optind+1) {
 		fig_num = atoi(argv[optind+1]);
 	} else fig_num = 1;
-	//TODO: create job_name.mp if it doesn't exist
 
 	initialise();
 
@@ -489,10 +487,12 @@ void refresh() {
 	}*/
 	if (!help) box_msg("Running metapost...");
 
-	int ret = create_mp_file(job_name,tmp_job_name);
+	char tmp_filename[strlen(tmp_job_name)+4];
+	sprintf(tmp_filename,"%s.mp",tmp_job_name);
+	int ret = create_mp_file(mp_filename,tmp_filename);
 	if (ret != 0) {
 		error();
-		if (ret == 1) printf("Couldn't open %s.mp\n",job_name);
+		if (ret == 1) printf("Couldn't open %s\n",mp_filename);
 		else if (ret == 2) printf("Couldn't open %s.mp for writing\n",tmp_job_name);
 	} else if (run_mpost(tmp_job_name) != 0 || get_coords(tmp_job_name) != 0) {
 		error();

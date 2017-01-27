@@ -22,7 +22,7 @@ int n_fig; //number of figures
 int density; //points per inch for bitmap. changes when we zoom in
 
 //create a new mp file from the original, with commands added to save the coords and override outputtemplate and prologues
-int create_mp_file(char *job_name_in, char *job_name_out);
+int create_mp_file(char *filename_in, char *filename_out);
 //run metapost to create ps/pdf file
 int run_mpost(char *job_name);
 //get the coordinates of the lower left corner of the image, which are written in job_name.log

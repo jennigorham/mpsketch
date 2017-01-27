@@ -12,12 +12,7 @@ int run_mpost(char *job_name) {
 	return system(cmd);
 }
 
-int create_mp_file(char *job_name_in, char *job_name_out) {
-	char filename_in[strlen(job_name_in)+4];
-	char filename_out[strlen(job_name_out)+4];
-	sprintf(filename_in,"%s.mp",job_name_in);
-	sprintf(filename_out,"%s.mp",job_name_out);
-
+int create_mp_file(char *filename_in, char *filename_out) {
 	FILE *file_in = fopen(filename_in,"r");
 	if (file_in == NULL) return 1;
 	FILE *file_out = fopen(filename_out,"w");

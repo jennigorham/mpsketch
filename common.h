@@ -19,7 +19,7 @@
 #define CORNER_MODE 2
 #define CIRCLE_MODE 3
 
-char *job_name; //The part of the metapost filename before ".mp"
+char *mp_filename;
 char tmp_job_name[100];
 
 int trace_x_offset,trace_y_offset;

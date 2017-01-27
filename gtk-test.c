@@ -39,6 +39,8 @@ double scroll_centre_y;
 //scale of mp_png
 double scale;
 
+static gboolean refresh(gpointer window);
+
 gchar *get_info_msg() {
 	//not mentioned: 'r' to refresh metapost, 't' to toggle trace, and 'p' to push path
 	if (finished_drawing) {
@@ -123,6 +125,26 @@ void show_help(gpointer window) {
 	gtk_widget_destroy(dialog);
 }
 
+void open_dialog(GtkWidget *window) {
+	GtkWidget *dialog;
+	gint res;
+	dialog = gtk_file_chooser_dialog_new (
+		"Open File",
+		GTK_WINDOW(window),
+		GTK_FILE_CHOOSER_ACTION_OPEN,
+		"Cancel",GTK_RESPONSE_CANCEL,
+		"Open",GTK_RESPONSE_ACCEPT,
+		NULL);
+	res = gtk_dialog_run (GTK_DIALOG (dialog));
+	if (res == GTK_RESPONSE_ACCEPT) {
+		g_free(mp_filename);
+		mp_filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER (dialog));
+		gtk_label_set_text (GTK_LABEL (message_label), "Running metapost...");
+		g_idle_add(refresh,GTK_WINDOW(window));
+	}
+	gtk_widget_destroy(dialog);
+}
+
 void adjust_darea_size() {
 	sketch_width  = scale*(2*MP_BORDER + cairo_image_surface_get_width(mp_png));
 	sketch_height = scale*(2*MP_BORDER + cairo_image_surface_get_height(mp_png));
@@ -138,9 +160,12 @@ void get_figure(gpointer window) {
 	if (ret != 0) {
 		if (ret == 1) show_error(window,"Couldn't open %s.log.",tmp_job_name);
 		else if (ret == 2) {
-			char s[10];
-			snprintf(s,sizeof s,"%d",fig_num);
-			show_error(window,"Couldn't find figure %s coordinates. Ensure figure number is correct.",s);
+			if (n_fig == 0) show_error(window,"%s","No figures found.");
+			else {
+				fig_num = figures[0];
+				printf("Falling back to figure %d...\n",fig_num);
+				get_figure(window);
+			}
 		}
 	} else if (make_png(tmp_job_name) != 0) {
 		show_error(window,"%s","Error converting to png. See stdout for more details.");
@@ -190,9 +215,11 @@ void select_figure(gpointer window) {
 
 //rerun metapost, convert to png
 static gboolean refresh(gpointer window) {
-	int ret = create_mp_file(job_name,tmp_job_name);
+	char tmp_filename[strlen(tmp_job_name)+4];
+	sprintf(tmp_filename,"%s.mp",tmp_job_name);
+	int ret = create_mp_file(mp_filename,tmp_filename);
 	if (ret == 1) 
-		show_error(window,"Couldn't open %s.mp",job_name);
+		show_error(window,"Couldn't open %s",mp_filename);
 	else if (ret == 2)
 		show_error(window,"Couldn't open %s.mp for writing",tmp_job_name);
 	else if (run_mpost(tmp_job_name) != 0) {
@@ -443,8 +470,10 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 				redraw_screen();
 				break;
 			case GDK_KEY_r: //refresh metapost
-				gtk_label_set_text (GTK_LABEL (message_label), "Running metapost...");
-				g_idle_add(refresh,GTK_WINDOW(widget));
+				if (mp_filename) {
+					gtk_label_set_text (GTK_LABEL (message_label), "Running metapost...");
+					g_idle_add(refresh,GTK_WINDOW(widget));
+				}
 				break;
 			case GDK_KEY_minus: //straight line mode
 				path_mode_change(true);
@@ -503,7 +532,12 @@ static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox)
 	GtkAccelGroup *accel_group = gtk_accel_group_new();
 	gtk_window_add_accel_group(GTK_WINDOW(window), accel_group);
 
-	GtkWidget *fig_mi = gtk_menu_item_new_with_label("Change figure");
+	GtkWidget *open_mi = gtk_menu_item_new_with_label("Open...");
+	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), open_mi);
+	g_signal_connect_swapped(G_OBJECT(open_mi), "activate", G_CALLBACK (open_dialog), window);
+	gtk_widget_add_accelerator(open_mi, "activate", accel_group, GDK_KEY_o, 0, GTK_ACCEL_VISIBLE);
+
+	GtkWidget *fig_mi = gtk_menu_item_new_with_label("Change figure...");
 	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), fig_mi);
 	g_signal_connect_swapped(G_OBJECT(fig_mi), "activate", G_CALLBACK (select_figure), window);
 	gtk_widget_add_accelerator(fig_mi, "activate", accel_group, GDK_KEY_f, 0, GTK_ACCEL_VISIBLE);
@@ -526,9 +560,6 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	GtkWidget *window;
 
 	initialise();
-
-	if (job_name == NULL) job_name = "test";
-	//mp_png = cairo_image_surface_create_from_png("test.png");
 
 	window = gtk_application_window_new (app);
 	gtk_window_set_title (GTK_WINDOW (window), "MPSketch");
@@ -573,7 +604,7 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	density = 100;
 	scale = 1;
 	pixels_per_point = scale*density/INCH;
-	refresh(window);
+	if (mp_filename) refresh(window);
 
 	g_timeout_add(100,scroll_to_origin,window);
 }
@@ -584,11 +615,10 @@ static void open(GApplication *app,
                  gchar        *hint,
                  gpointer      user_data) {
 
-	job_name = g_file_get_basename(files[0]);
+	mp_filename = g_file_get_parse_name(files[0]);
 	//check that it ends in ".mp"
-	if (strcmp(job_name + strlen(job_name) - 3,".mp") == 0) {
-		job_name[strlen(job_name) - 3] = '\0';
-		printf("Opening %s\n",g_file_get_parse_name(files[0]));
+	if (strcmp(mp_filename + strlen(mp_filename) - 3,".mp") == 0) {
+		printf("Opening %s\n",mp_filename);
 		activate(GTK_APPLICATION (app),NULL);
 	} else {
 		g_print("Argument is not an mp file\n");
@@ -648,6 +678,7 @@ int main (int argc, char **argv) {
 	g_signal_connect (app, "open", G_CALLBACK (open), NULL);
 	status = g_application_run (G_APPLICATION (app), argc, argv);
 	g_object_unref (app);
+	g_free(mp_filename);
 
 	cairo_surface_destroy(mp_png);
 	cairo_surface_destroy(trace);
