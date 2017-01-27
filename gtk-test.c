@@ -60,11 +60,11 @@ gchar *get_info_msg() {
 			}
 		} else {
 			if (mode == CURVE_MODE)
-				return "Click to start drawing a curve. Press '-' for straight line mode, 'c' for circle mode, 'h' to show help.";
+				return "Click to start drawing a curve. Press '-' for straight line mode, 'c' for circle mode, '?' to show help.";
 			else if (mode == STRAIGHT_MODE)
-				return "Click to start drawing straight lines. Press '.' for curve mode, 'c' for circle mode, 'h' to show help.";
+				return "Click to start drawing straight lines. Press '.' for curve mode, 'c' for circle mode, '?' to show help.";
 			else if (mode == CIRCLE_MODE)
-				return "Click to start drawing a circle. Press '-' for straight line mode, '.' for curve mode, 'h' to show help.";
+				return "Click to start drawing a circle. Press '-' for straight line mode, '.' for curve mode, '?' to show help.";
 		}
 	} else {
 		if (mode == CURVE_MODE)
@@ -104,8 +104,7 @@ void show_help(gpointer window) {
 			//"t = toggle trace visibility\n"
 			"z = zoom in, shift-z = zoom out\n"
 			"p or ctrl-v = paste path from clipboard\n"
-			"h or ? = show this help dialog\n"
-			"q = quit\n"
+			"? = show this help dialog\n"
 
 			"\nDrawing paths and circles:\n"
 			"'.' = curve mode, '-' = straight line mode, c = circle mode\n"
@@ -398,11 +397,6 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 					redraw_screen();
 				}
 				break;
-			//help
-			case GDK_KEY_question:
-			case GDK_KEY_h:
-				show_help(GTK_WINDOW(widget));
-				break;
 			case GDK_KEY_Z: //zoom out
 				//remember where we want to scroll to
 				scroll_centre_x = pxl_to_mp_x_coord(gtk_adjustment_get_value(hadj) + win_width/2);
@@ -418,9 +412,6 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 
 				scale *= 1.5;
 				adjust_darea_size();
-				break;
-			case GDK_KEY_f: 
-				select_figure(widget);
 				break;
 			case GDK_KEY_i: //insert point before edit_point
 				if (edit) {
@@ -454,9 +445,6 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 			case GDK_KEY_r: //refresh metapost
 				gtk_label_set_text (GTK_LABEL (message_label), "Running metapost...");
 				g_idle_add(refresh,GTK_WINDOW(widget));
-				break;
-			case GDK_KEY_q: //quit
-				gtk_widget_destroy(widget);
 				break;
 			case GDK_KEY_minus: //straight line mode
 				path_mode_change(true);
@@ -506,6 +494,34 @@ static gboolean on_motion(GtkWidget *widget, GdkEventMotion *event, gpointer use
 	return FALSE;
 }
 
+static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox) {
+	GtkWidget *menubar = gtk_menu_bar_new();
+	GtkWidget *file_menu = gtk_menu_new();
+	GtkWidget *file_mi = gtk_menu_item_new_with_label("File");
+	gtk_menu_item_set_submenu(GTK_MENU_ITEM(file_mi), file_menu);
+
+	GtkAccelGroup *accel_group = gtk_accel_group_new();
+	gtk_window_add_accel_group(GTK_WINDOW(window), accel_group);
+
+	GtkWidget *fig_mi = gtk_menu_item_new_with_label("Change figure");
+	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), fig_mi);
+	g_signal_connect_swapped(G_OBJECT(fig_mi), "activate", G_CALLBACK (select_figure), window);
+	gtk_widget_add_accelerator(fig_mi, "activate", accel_group, GDK_KEY_f, 0, GTK_ACCEL_VISIBLE);
+
+	GtkWidget *help_mi = gtk_menu_item_new_with_label("Help");
+	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), help_mi);
+	g_signal_connect_swapped(G_OBJECT(help_mi), "activate", G_CALLBACK (show_help), window);
+	gtk_widget_add_accelerator(help_mi, "activate", accel_group, GDK_KEY_question, 0, GTK_ACCEL_VISIBLE);
+
+	GtkWidget *quit_mi = gtk_menu_item_new_with_label("Quit");
+	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), quit_mi);
+	g_signal_connect_swapped(G_OBJECT(quit_mi), "activate", G_CALLBACK (g_application_quit), G_APPLICATION(app));
+	gtk_widget_add_accelerator(quit_mi, "activate", accel_group, GDK_KEY_q, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+
+	gtk_menu_shell_append(GTK_MENU_SHELL(menubar), file_mi);
+	gtk_box_pack_start(GTK_BOX(vbox), menubar, FALSE, FALSE, 0);
+}
+
 static void activate (GtkApplication* app, gpointer user_data) {
 	GtkWidget *window;
 
@@ -521,35 +537,16 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	gtk_widget_add_events(window, GDK_POINTER_MOTION_MASK);
 	gtk_widget_add_events(window, GDK_BUTTON_RELEASE_MASK);
 	gtk_widget_add_events(window, GDK_SCROLL_MASK);
-	g_signal_connect(window, "button-press-event", G_CALLBACK(button_press), NULL);
-	g_signal_connect(window, "button-release-event", G_CALLBACK(button_release), NULL);
-	g_signal_connect(window, "key-press-event", G_CALLBACK (key_press), NULL);
-	g_signal_connect(window, "motion-notify-event", G_CALLBACK (on_motion), NULL);
-	g_signal_connect(window, "configure-event", G_CALLBACK(resize), NULL);
+	g_signal_connect(window, "button-press-event",		G_CALLBACK(button_press),	NULL);
+	g_signal_connect(window, "button-release-event",	G_CALLBACK(button_release), NULL);
+	g_signal_connect(window, "key-press-event",			G_CALLBACK(key_press),		NULL);
+	g_signal_connect(window, "motion-notify-event",		G_CALLBACK(on_motion),		NULL);
+	g_signal_connect(window, "configure-event",			G_CALLBACK(resize),			NULL);
 
 	GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	gtk_container_add(GTK_CONTAINER(window), vbox);
 
-	//menus
-	GtkWidget *menubar = gtk_menu_bar_new();
-	GtkWidget *file_menu = gtk_menu_new();
-	GtkWidget *file_mi = gtk_menu_item_new_with_label("File");
-	gtk_menu_item_set_submenu(GTK_MENU_ITEM(file_mi), file_menu);
-
-	GtkWidget *fig_mi = gtk_menu_item_new_with_label("Change figure");
-	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), fig_mi);
-	g_signal_connect_swapped(G_OBJECT(fig_mi), "activate", G_CALLBACK (select_figure), window);
-
-	GtkWidget *help_mi = gtk_menu_item_new_with_label("Help");
-	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), help_mi);
-	g_signal_connect_swapped(G_OBJECT(help_mi), "activate", G_CALLBACK (show_help), window);
-
-	GtkWidget *quit_mi = gtk_menu_item_new_with_label("Quit");
-	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), quit_mi);
-	g_signal_connect_swapped(G_OBJECT(quit_mi), "activate", G_CALLBACK (g_application_quit), G_APPLICATION(app));
-
-	gtk_menu_shell_append(GTK_MENU_SHELL(menubar), file_mi);
-	gtk_box_pack_start(GTK_BOX(vbox), menubar, FALSE, FALSE, 0);
+	setup_menus(app,window,vbox);
 
 	scrolled_window = gtk_scrolled_window_new (NULL, NULL);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolled_window),
