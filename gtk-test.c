@@ -207,6 +207,8 @@ void get_figure(gpointer window) {
 				printf("Falling back to figure %d...\n",fig_num);
 				get_figure(window);
 			}
+		} else if (ret == 3) {
+			show_error(window,"%s","Aborting due to missing font. See stderr for more details.");
 		}
 	} else if (make_png(tmp_job_name) != 0) {
 		show_error(window,"%s","Error converting to png. See stdout for more details.");

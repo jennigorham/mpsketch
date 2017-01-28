@@ -76,6 +76,14 @@ int get_coords(char *job_name) {
 		char *substring = ">> \"Figure ";
 		n_fig = 0;
 		while (fgets(buffer,sizeof(buffer),log) != NULL) {
+			//check for font warning. mpost will return success, but it can make ghostscript hang when we run convert
+			char *bad_font = "Warning: font ";
+			if (strncmp(buffer, bad_font, strlen(bad_font)) == 0) {
+				n_fig = 0;
+				fprintf(stderr,"Aborting due to missing font: \"%s\"\n",buffer);
+				return 3;
+			}
+
 			if (strncmp(buffer,substring,strlen(substring)) == 0) {
 				//make a record that this figure number is available
 				char *num = buffer + strlen(substring);
@@ -115,7 +123,6 @@ int get_coords(char *job_name) {
 
 		if (!found_coords) {
 			fprintf(stderr,"ERROR: figure %d coordinates not found in '%s.log'.\n",fig_num,job_name);
-			puts("Ensure that the figure number is correct.");
 			return 2;
 		} else return 0;
 	}
