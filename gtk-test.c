@@ -9,7 +9,6 @@
 /*
 TODO:
 corner mode
-move trace
 custom precision
 check for find_control_points() failure?
 
@@ -141,6 +140,13 @@ void open_dialog(GtkWidget *window) {
 		"Cancel",GTK_RESPONSE_CANCEL,
 		"Open",GTK_RESPONSE_ACCEPT,
 		NULL);
+
+	//show only mp files
+	GtkFileFilter *filter = gtk_file_filter_new ();
+	gtk_file_filter_add_pattern(filter, "*.mp");
+	gtk_file_filter_set_name (filter,"MetaPost Files");
+	gtk_file_chooser_add_filter(GTK_FILE_CHOOSER (dialog),filter);
+
 	res = gtk_dialog_run (GTK_DIALOG (dialog));
 	if (res == GTK_RESPONSE_ACCEPT) {
 		g_free(mp_filename);
