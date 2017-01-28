@@ -39,6 +39,12 @@ double scroll_centre_y;
 //scale of mp_png
 double scale;
 
+//menu items that need to be deactivated/reactivated
+GtkWidget *resume_mi;
+GtkWidget *fig_mi;
+GtkWidget *next_fig_mi;
+GtkWidget *prev_fig_mi;
+
 static gboolean refresh(gpointer window);
 
 gchar *get_info_msg() {
@@ -86,6 +92,9 @@ void mode_change() {
 	char s[strlen(msg) + 10];
 	snprintf(s,sizeof(s),"Fig%d | %s",fig_num,msg);
 	gtk_label_set_text (GTK_LABEL (message_label), s);
+
+	if (!finished_drawing || cur_path->n < 1)
+		gtk_widget_set_sensitive(resume_mi,false);
 }
 
 void show_error(gpointer window,char *fmt,char *msg) {//http://zetcode.com/gui/gtk2/gtkdialogs/
@@ -194,6 +203,16 @@ void get_figure(gpointer window) {
 		mp_png = cairo_image_surface_create_from_png(png);
 
 		adjust_darea_size();
+		//if there's only one fig then we don't need the menu items for changing figs
+		if (n_fig > 1) {
+			gtk_widget_set_sensitive(fig_mi,true);
+			gtk_widget_set_sensitive(next_fig_mi,true);
+			gtk_widget_set_sensitive(prev_fig_mi,true);
+		} else {
+			gtk_widget_set_sensitive(fig_mi,false);
+			gtk_widget_set_sensitive(next_fig_mi,false);
+			gtk_widget_set_sensitive(prev_fig_mi,false);
+		}
 	}
 }
 
@@ -469,11 +488,15 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 					redraw_screen();
 				} else
 					end_path();
+					if (mode != CIRCLE_MODE)
+						gtk_widget_set_sensitive(resume_mi,true);
 				break;
 			case GDK_KEY_Return: //cycle
 				if (!finished_drawing) {
 					cur_path->cycle = true;
 					end_path();
+					if (mode != CIRCLE_MODE)
+						gtk_widget_set_sensitive(resume_mi,true);
 				} else if (edit) {
 					cur_path->cycle = !cur_path->cycle;
 					redraw_screen();
@@ -578,34 +601,63 @@ static gboolean on_motion(GtkWidget *widget, GdkEventMotion *event, gpointer use
 	return FALSE;
 }
 
+void resume_drawing(gpointer window) {
+	if (finished_drawing && cur_path->n > 0) {
+		finished_drawing = false;
+		cur_path->cycle = false;
+		struct point p = cur_path->points[cur_path->n-1];
+		mode = p.straight ? STRAIGHT_MODE : CURVE_MODE;
+
+		//get the coords of the pointer
+		gint wx, wy;
+		GdkDisplay *display = gdk_display_get_default ();
+		GdkDeviceManager *device_manager = gdk_display_get_device_manager (display);
+		GdkDevice *device = gdk_device_manager_get_client_pointer (device_manager);
+		gdk_window_get_device_position(gtk_widget_get_window(window),device,&wx,&wy,NULL);
+		int x,y;
+		darea_coords(wx,wy,&x,&y);
+
+		append_point(
+			pxl_to_mp_x_coord(x),
+			pxl_to_mp_y_coord(y),
+			p.straight);
+		redraw_screen();
+	}
+}
+
 static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox) {
 	GtkWidget *menubar = gtk_menu_bar_new();
-	GtkWidget *file_menu = gtk_menu_new();
-	GtkWidget *file_mi = gtk_menu_item_new_with_label("File");
-	gtk_menu_item_set_submenu(GTK_MENU_ITEM(file_mi), file_menu);
 
 	GtkAccelGroup *accel_group = gtk_accel_group_new();
 	gtk_window_add_accel_group(GTK_WINDOW(window), accel_group);
+
+	//File menu
+	GtkWidget *file_menu = gtk_menu_new();
+	GtkWidget *file_mi = gtk_menu_item_new_with_label("File");
+	gtk_menu_item_set_submenu(GTK_MENU_ITEM(file_mi), file_menu);
 
 	GtkWidget *open_mi = gtk_menu_item_new_with_label("Open...");
 	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), open_mi);
 	g_signal_connect_swapped(G_OBJECT(open_mi), "activate", G_CALLBACK (open_dialog), window);
 	gtk_widget_add_accelerator(open_mi, "activate", accel_group, GDK_KEY_o, 0, GTK_ACCEL_VISIBLE);
 
-	GtkWidget *fig_mi = gtk_menu_item_new_with_label("Change figure...");
+	fig_mi = gtk_menu_item_new_with_label("Change figure...");
 	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), fig_mi);
 	g_signal_connect_swapped(G_OBJECT(fig_mi), "activate", G_CALLBACK (select_figure), window);
 	gtk_widget_add_accelerator(fig_mi, "activate", accel_group, GDK_KEY_f, 0, GTK_ACCEL_VISIBLE);
+	gtk_widget_set_sensitive(fig_mi,false);
 
-	GtkWidget *next_fig_mi = gtk_menu_item_new_with_label("Next figure");
+	next_fig_mi = gtk_menu_item_new_with_label("Next figure");
 	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), next_fig_mi);
 	g_signal_connect_swapped(G_OBJECT(next_fig_mi), "activate", G_CALLBACK (next_fig),window);
 	gtk_widget_add_accelerator(next_fig_mi, "activate", accel_group, GDK_KEY_Page_Down, 0, GTK_ACCEL_VISIBLE);
+	gtk_widget_set_sensitive(next_fig_mi,false);
 
-	GtkWidget *prev_fig_mi = gtk_menu_item_new_with_label("Previous figure");
+	prev_fig_mi = gtk_menu_item_new_with_label("Previous figure");
 	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), prev_fig_mi);
 	g_signal_connect_swapped(G_OBJECT(prev_fig_mi), "activate", G_CALLBACK (prev_fig),window);
 	gtk_widget_add_accelerator(prev_fig_mi, "activate", accel_group, GDK_KEY_Page_Up, 0, GTK_ACCEL_VISIBLE);
+	gtk_widget_set_sensitive(prev_fig_mi,false);
 
 	GtkWidget *help_mi = gtk_menu_item_new_with_label("Help");
 	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), help_mi);
@@ -617,7 +669,19 @@ static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox)
 	g_signal_connect_swapped(G_OBJECT(quit_mi), "activate", G_CALLBACK (g_application_quit), G_APPLICATION(app));
 	gtk_widget_add_accelerator(quit_mi, "activate", accel_group, GDK_KEY_q, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
 
+	//Sketch menu
+	GtkWidget *sketch_menu = gtk_menu_new();
+	GtkWidget *sketch_mi = gtk_menu_item_new_with_label("Sketch");
+	gtk_menu_item_set_submenu(GTK_MENU_ITEM(sketch_mi), sketch_menu);
+
+	resume_mi = gtk_menu_item_new_with_label("Resume drawing path");
+	gtk_menu_shell_append(GTK_MENU_SHELL(sketch_menu), resume_mi);
+	g_signal_connect_swapped(G_OBJECT(resume_mi), "activate", G_CALLBACK (resume_drawing), window);
+	gtk_widget_add_accelerator(resume_mi, "activate", accel_group, GDK_KEY_k, 0, GTK_ACCEL_VISIBLE);
+	gtk_widget_set_sensitive(resume_mi,false);
+
 	gtk_menu_shell_append(GTK_MENU_SHELL(menubar), file_mi);
+	gtk_menu_shell_append(GTK_MENU_SHELL(menubar), sketch_mi);
 	gtk_box_pack_start(GTK_BOX(vbox), menubar, FALSE, FALSE, 0);
 }
 
