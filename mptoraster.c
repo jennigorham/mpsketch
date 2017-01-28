@@ -87,13 +87,19 @@ int get_coords(char *job_name) {
 					//get x-coord
 					char *x = space + strlen("coordinates: (") + 1;
 					char *comma = strchr(x,',');
-					if (comma == NULL) continue;
+					if (comma == NULL) { //something weird going on
+						n_fig = 0;
+						break;
+					}
 					*comma = '\0';
 
 					//get y-coord
 					char *y = comma + 1;
 					char *bracket = strchr(y,')');
-					if (bracket == NULL) continue;
+					if (bracket == NULL) { //something weird going on
+						n_fig = 0;
+						break;
+					}
 					*bracket = '\0';
 
 					ll_x = strtof(x,NULL);
