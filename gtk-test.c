@@ -93,8 +93,21 @@ void mode_change() {
 	snprintf(s,sizeof(s),"Fig%d | %s",fig_num,msg);
 	gtk_label_set_text (GTK_LABEL (message_label), s);
 
+	//disable resume drawing menu item unless we have a resumable path
 	if (!finished_drawing || cur_path->n < 1)
 		gtk_widget_set_sensitive(resume_mi,false);
+}
+
+void curve_mode() {
+	path_mode_change(false);
+}
+void straight_mode() {
+	path_mode_change(true);
+}
+void circle_mode() {
+	if (!finished_drawing) end_path();
+	mode=CIRCLE_MODE;
+	mode_change();
 }
 
 void show_error(gpointer window,char *fmt,char *msg) {//http://zetcode.com/gui/gtk2/gtkdialogs/
@@ -488,6 +501,7 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 					redraw_screen();
 				} else
 					end_path();
+					//activate the resume drawing menu item
 					if (mode != CIRCLE_MODE)
 						gtk_widget_set_sensitive(resume_mi,true);
 				break;
@@ -495,6 +509,7 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 				if (!finished_drawing) {
 					cur_path->cycle = true;
 					end_path();
+					//activate the resume drawing menu item
 					if (mode != CIRCLE_MODE)
 						gtk_widget_set_sensitive(resume_mi,true);
 				} else if (edit) {
@@ -553,14 +568,6 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 					g_idle_add(refresh,GTK_WINDOW(widget));
 				}
 				break;
-			case GDK_KEY_minus: //straight line mode
-				path_mode_change(true);
-				mode_change();
-				break;
-			case GDK_KEY_period: //curve mode
-				path_mode_change(false);
-				mode_change();
-				break;
 			case GDK_KEY_v:
 				if (event->state & GDK_CONTROL_MASK) { //ctrl-v paste
 					push_path();
@@ -569,10 +576,6 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 			case GDK_KEY_c:
 				if (event->state & GDK_CONTROL_MASK) { //ctrl-c copy
 					output_path();
-				} else { //circle mode
-					if (!finished_drawing) end_path();
-					mode=CIRCLE_MODE;
-					mode_change();
 				}
 				break;
 			case GDK_KEY_x:
@@ -679,6 +682,29 @@ static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox)
 	g_signal_connect_swapped(G_OBJECT(resume_mi), "activate", G_CALLBACK (resume_drawing), window);
 	gtk_widget_add_accelerator(resume_mi, "activate", accel_group, GDK_KEY_k, 0, GTK_ACCEL_VISIBLE);
 	gtk_widget_set_sensitive(resume_mi,false);
+
+	GtkWidget *sep = gtk_separator_menu_item_new();
+	gtk_menu_shell_append(GTK_MENU_SHELL(sketch_menu), sep);
+
+	//Drawing modes: curve/straight/circle
+	GSList *group = NULL;
+
+	GtkWidget *curve_mi = gtk_radio_menu_item_new_with_label (group,".. Curve mode");
+	gtk_menu_shell_append(GTK_MENU_SHELL(sketch_menu), curve_mi);
+	g_signal_connect(G_OBJECT(curve_mi), "activate", G_CALLBACK (curve_mode), NULL);
+	gtk_widget_add_accelerator(curve_mi, "activate", accel_group, GDK_KEY_period, 0, GTK_ACCEL_VISIBLE);
+	group = gtk_radio_menu_item_get_group(GTK_RADIO_MENU_ITEM(curve_mi));
+
+	GtkWidget *straight_mi = gtk_radio_menu_item_new_with_label (group,"-- Straight line mode");
+	gtk_menu_shell_append(GTK_MENU_SHELL(sketch_menu), straight_mi);
+	g_signal_connect(G_OBJECT(straight_mi), "activate", G_CALLBACK (straight_mode), NULL);
+	gtk_widget_add_accelerator(straight_mi, "activate", accel_group, GDK_KEY_minus, 0, GTK_ACCEL_VISIBLE);
+
+	GtkWidget *circle_mi = gtk_radio_menu_item_new_with_label (group,"Circle mode");
+	gtk_menu_shell_append(GTK_MENU_SHELL(sketch_menu), circle_mi);
+	g_signal_connect(G_OBJECT(circle_mi), "activate", G_CALLBACK (circle_mode), NULL);
+	gtk_widget_add_accelerator(circle_mi, "activate", accel_group, GDK_KEY_c, 0, GTK_ACCEL_VISIBLE);
+
 
 	gtk_menu_shell_append(GTK_MENU_SHELL(menubar), file_mi);
 	gtk_menu_shell_append(GTK_MENU_SHELL(menubar), sketch_mi);

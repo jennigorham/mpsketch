@@ -141,6 +141,7 @@ void path_mode_change(bool is_straight) {
 	else mode = CURVE_MODE;
 
 	redraw_screen();
+	mode_change();
 }
 
 void pointer_move(int x,int y) {
