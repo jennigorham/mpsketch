@@ -22,7 +22,7 @@
 char *mp_filename;
 char tmp_job_name[100];
 
-int trace_x_offset,trace_y_offset;
+double trace_x,trace_y; //coords of top left corner of tracing image
 bool show_trace;
 
 int mode; //drawing mode
@@ -46,10 +46,12 @@ double pxl_to_mp_y_coord(int y);
 
 //when we mouse over a point in a completed path, we can edit it
 bool edit;
-int edit_point; //which point are we editing
+int edit_point; //which point are we editing. the point at top left of trace is referred to as -1. non-negative values are points on cur_path
 bool dragging_point;
+void move_edit_point(int x, int y); //move the edit point to (x,y)
 
 void draw_path(); //draw the current path or circle
+void highlight_edit_point(); //highlight the point being edited (the point under the cursor)
 void output_path(); //print path to clipboard and stdout
 void path_mode_change(bool is_straight); //change to straight/curve mode
 void end_path();
@@ -65,6 +67,7 @@ void rm_tmp(); //remove temporary files
 //defined in mpsketch.c or gtk-test.c
 void draw_circle(double centre_x, double centre_y, int r);
 void draw_point(double centre_x, double centre_y);
+void fill_circle(double centre_x, double centre_y, int r);
 void link_point_pair(struct point *p, struct point *q); //draw either a straight line or a bezier curve linking two consecutive points on a path
 void copy_to_clipboard(char *s);
 void redraw_screen();

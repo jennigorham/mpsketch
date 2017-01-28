@@ -32,6 +32,15 @@ void draw_path() {
 	}
 }
 
+void highlight_edit_point() {
+	if (edit) {
+		if (edit_point == -1) //trace point
+			fill_circle(trace_x,trace_y,POINT_RADIUS);
+		else
+			fill_circle(cur_path->points[edit_point].x,cur_path->points[edit_point].y,POINT_RADIUS);
+	}
+}
+
 //Converting between metapost coords and pixels from upper left corner
 int mp_x_coord_to_pxl(double x) {
 	return round((x - ll_x)*pixels_per_point - x_offset);
@@ -60,15 +69,23 @@ void output_path() {
 	}
 }
 
-void click_point(int x, int y) {
-	if (dragging_point) {
-		dragging_point = false;
+void move_edit_point(int x, int y) {
+	if (edit_point == -1) {
+		trace_x = pxl_to_mp_x_coord(x);
+		trace_y = pxl_to_mp_y_coord(y);
+	} else {
 		set_coords(
 			edit_point,
 			pxl_to_mp_x_coord(x),
 			pxl_to_mp_y_coord(y)
 		);
-		redraw_screen();
+	}
+	redraw_screen();
+}
+void click_point(int x, int y) {
+	if (dragging_point) {
+		dragging_point = false;
+		move_edit_point(x,y);
 	} else if (mode == CIRCLE_MODE) {
 		if (finished_drawing) { //start a new circle
 			cur_path->n = 0;
@@ -118,7 +135,7 @@ void path_mode_change(bool is_straight) {
 		if (mode==CIRCLE_MODE) end_path();
 		else set_straight(cur_path->n-2,is_straight);
 	}
-	else if (edit) set_straight(edit_point,is_straight);
+	else if (edit && edit_point >= 0) set_straight(edit_point,is_straight);
 
 	if (is_straight) mode=STRAIGHT_MODE;
 	else mode = CURVE_MODE;
@@ -131,23 +148,31 @@ void pointer_move(int x,int y) {
 		set_coords(mode==CIRCLE_MODE ? 1 : cur_path->n-1,pxl_to_mp_x_coord(x),pxl_to_mp_y_coord(y));
 		redraw_screen();
 	} else if (dragging_point) {
-		set_coords(
-			edit_point,
-			pxl_to_mp_x_coord(x),
-			pxl_to_mp_y_coord(y)
-		);
-		redraw_screen();
+		move_edit_point(x,y);
 	} else {
 		//if the user mouses over a point on the path, they can edit it (drag it, change the section after it to straight/curved)
 		int i;
 		bool found_point=false;
 		for (i=0;i<(cur_path->n == -1 ? 2 : cur_path->n);i++) {
+			//find distance between cursor position and point
 			int delta_x, delta_y;
 			delta_x = mp_x_coord_to_pxl(cur_path->points[i].x) - x;
 			delta_y = mp_y_coord_to_pxl(cur_path->points[i].y) - y;
 			if (delta_x*delta_x + delta_y*delta_y < POINT_RADIUS*POINT_RADIUS) {
 				found_point=true;
 				break;
+			}
+		}
+
+		//can also edit the point at top left corner of trace
+		if (!found_point) {
+			//find distance between cursor position and point
+			int delta_x, delta_y;
+			delta_x = mp_x_coord_to_pxl(trace_x) - x;
+			delta_y = mp_y_coord_to_pxl(trace_y) - y;
+			if (delta_x*delta_x + delta_y*delta_y < POINT_RADIUS*POINT_RADIUS) {
+				found_point=true;
+				i = -1;
 			}
 		}
 		//redraw screen if edit or edit_point have changed

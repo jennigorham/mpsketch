@@ -41,8 +41,9 @@ int s; //screen
 Pixmap bitmap; //metapost output, converted to bitmap
 unsigned int bitmap_width, bitmap_height;
 
-Pixmap tracing_bitmap;
+Pixmap trace_bitmap;
 void get_trace();
+unsigned int trace_width,trace_height;
 
 bool quit=false;
 bool help=true; //show help message
@@ -352,21 +353,21 @@ void keypress(int keycode,int state) {
 		}
 		break;
 	case 43://d - delete a point
-		if (edit) {
+		if (edit && edit_point >= 0) {
 			remove_point(edit_point);
 			edit=false;
 			redraw_screen();
 		}
 		break;
 	case 42://i - insert a point before current point
-		if (edit) {
+		if (edit && edit_point >= 0) {
 			point_before(edit_point);
 			edit_point++;
 			redraw_screen();
 		}
 		break;
 	case 38://a - insert a point after current point
-		if (edit) {
+		if (edit && edit_point >= 0) {
 			point_before(edit_point+1);
 			redraw_screen();
 		}
@@ -549,22 +550,29 @@ void redraw_screen() {
 				0, 0,
 				1);
 		}
-		
-		if (show_trace) {
-			XCopyPlane(d, tracing_bitmap, w, gc,
-				trace_x_offset, trace_y_offset,
-				sketch_width, sketch_height,
+
+		if (show_trace && trace_bitmap) {
+			XCopyPlane(d, trace_bitmap, w, gc,
 				0, 0,
+				trace_width, trace_height,
+				mp_x_coord_to_pxl(trace_x), 
+				mp_y_coord_to_pxl(trace_y),
 				1);
+			//draw a point at top left of trace so we can drag it to move the trace
+			draw_point(trace_x, trace_y);
+			//make a border around the trace so it's clear the point goes with the trace
+			XDrawRectangle(d,w,gc,
+				mp_x_coord_to_pxl(trace_x),
+				mp_y_coord_to_pxl(trace_y),
+				trace_width,
+				trace_height);
 		}
 
 		draw_path();
-		if (edit)
-			fill_circle(cur_path->points[edit_point].x,cur_path->points[edit_point].y,POINT_RADIUS);
+		highlight_edit_point();
 	}
 }
 
 void get_trace(char *filename) {
-	unsigned int trace_width,trace_height;
-	if (get_bitmap(filename,d,w,&tracing_bitmap,&trace_width,&trace_height) != 0) show_trace = false;
+	if (get_bitmap(filename,d,w,&trace_bitmap,&trace_width,&trace_height) != 0) show_trace = false;
 }

@@ -46,7 +46,9 @@ gchar *get_info_msg() {
 	//not mentioned: 'r' to refresh metapost, 't' to toggle trace, and 'p' to push path
 	if (finished_drawing) {
 		if (edit) {
-			if (cur_path->n == -1) {
+			if (edit_point == -1) {
+				return "Click and drag to move trace.";
+			} else if (cur_path->n == -1) {
 				return "Click and drag point. Then press 'y' to copy the new circle.";
 			} else if (cur_path-> n == 1) {
 				return "Click and drag point. Then press 'y' to copy the new coordinates.";
@@ -320,8 +322,11 @@ void link_point_pair(struct point *p, struct point *q) {
 }
 static gboolean on_draw_event(GtkWidget *widget, cairo_t *this_cr, gpointer user_data) {
 	cr = this_cr; //make it global. Otherwise I'd have to pass it to draw_path which would no longer be common between the xlib and gtk versions
+
 	if (show_trace && trace) {
-		cairo_set_source_surface(cr, trace, trace_x_offset, trace_y_offset);
+		cairo_set_source_surface(cr, trace,
+			mp_x_coord_to_pxl(trace_x), 
+			mp_y_coord_to_pxl(trace_y));
 		cairo_paint(cr);
 	}
 
@@ -341,11 +346,24 @@ static gboolean on_draw_event(GtkWidget *widget, cairo_t *this_cr, gpointer user
 	cairo_set_source_rgb(cr, 0, 0, 0);
 	cairo_set_line_width(cr, 0.5);
 
-	draw_path();
-	cairo_stroke(cr);
+	if (show_trace && trace) {
+		//make a border around the trace so it's clear the point goes with the trace
+		cairo_rectangle(cr,
+			mp_x_coord_to_pxl(trace_x), 
+			mp_y_coord_to_pxl(trace_y),
+			cairo_image_surface_get_width(trace),
+			cairo_image_surface_get_height(trace));
+		static const double dashed1[] = {10.0,10.0};
+		cairo_set_dash(cr, dashed1, 2, 1);
+		cairo_stroke(cr);
+		cairo_set_dash(cr, NULL, 0, 1);
+		//draw the edit point at top left of trace
+		draw_point(trace_x, trace_y);
+	}
 
-	if (edit)
-		fill_circle(cur_path->points[edit_point].x,cur_path->points[edit_point].y,POINT_RADIUS);
+	draw_path();
+
+	highlight_edit_point();
 
 	return FALSE;
 }
@@ -472,21 +490,21 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 				adjust_darea_size();
 				break;
 			case GDK_KEY_i: //insert point before edit_point
-				if (edit) {
+				if (edit && edit_point >= 0) {
 					point_before(edit_point);
 					edit_point++;
 					redraw_screen();
 				}
 				break;
 			case GDK_KEY_a: //append point after edit_point
-				if (edit) {
+				if (edit && edit_point >= 0) {
 					point_before(edit_point+1);
 					redraw_screen();
 					mode_change();
 				}
 				break;
 			case GDK_KEY_d: //delete point
-				if (edit) {
+				if (edit && edit_point >= 0) {
 					remove_point(edit_point);
 					edit=false;
 					redraw_screen();
@@ -682,8 +700,8 @@ static gboolean get_unit(gchar *option_name,gchar *value,gpointer data,GError **
 }
 static gboolean get_trace(gchar *option_name,gchar *value,gpointer data,GError **error) {
 	show_trace = true;
-	trace_x_offset = 0;
-	trace_y_offset = 0;
+	trace_x = 0;
+	trace_y = 0;
 	trace = cairo_image_surface_create_from_png(value);
 	if (cairo_surface_status(trace) != CAIRO_STATUS_SUCCESS) {
 		g_set_error(error,G_OPTION_ERROR, G_OPTION_ERROR_FAILED,"Couldn't get trace image from %s.\n",value);
