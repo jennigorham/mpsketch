@@ -166,7 +166,7 @@ void pointer_move(int x,int y) {
 		}
 
 		//can also edit the point at top left corner of trace
-		if (!found_point) {
+		if (!found_point && show_trace) {
 			//find distance between cursor position and point
 			int delta_x, delta_y;
 			delta_x = mp_x_coord_to_pxl(trace_x) - x;
