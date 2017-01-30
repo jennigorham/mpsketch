@@ -350,25 +350,36 @@ void get_figure(gpointer window) {
 	} else {
 		char png[strlen(tmp_job_name)+5];
 		sprintf(png,"%s.png",tmp_job_name);
-		mp_png = cairo_image_surface_create_from_png(png);
-
-		adjust_darea_size();
-		//if there's only one fig then we don't need the menu items for changing figs
-		if (n_fig > 1) {
-			gtk_widget_set_sensitive(fig_mi,true);
-			gtk_widget_set_sensitive(next_fig_mi,true);
-			gtk_widget_set_sensitive(prev_fig_mi,true);
-		} else {
-			gtk_widget_set_sensitive(fig_mi,false);
-			gtk_widget_set_sensitive(next_fig_mi,false);
-			gtk_widget_set_sensitive(prev_fig_mi,false);
+		cairo_surface_t *surface = cairo_image_surface_create_from_png(png);
+		if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS)
+			show_error(window,"Couldn't load %s",png);
+		else {
+			cairo_surface_destroy(mp_png);
+			mp_png = surface;
+			adjust_darea_size();
 		}
+	}
+	//if there's only one fig then we don't need the menu items for changing figs
+	if (n_fig > 1) {
+		gtk_widget_set_sensitive(fig_mi,true);
+		gtk_widget_set_sensitive(next_fig_mi,true);
+		gtk_widget_set_sensitive(prev_fig_mi,true);
+	} else {
+		gtk_widget_set_sensitive(fig_mi,false);
+		gtk_widget_set_sensitive(next_fig_mi,false);
+		gtk_widget_set_sensitive(prev_fig_mi,false);
 	}
 }
 
 void adjust_darea_size() {
-	sketch_width  = scale*(2*MP_BORDER + cairo_image_surface_get_width(mp_png));
-	sketch_height = scale*(2*MP_BORDER + cairo_image_surface_get_height(mp_png));
+	int w = 0;
+	int h = 0;
+	if (mp_png) {
+		w = cairo_image_surface_get_width(mp_png);
+		h = cairo_image_surface_get_height(mp_png);
+	}
+	sketch_width  = scale*(2*MP_BORDER + w);
+	sketch_height = scale*(2*MP_BORDER + h);
 	gtk_widget_set_size_request(darea, sketch_width, sketch_height);
 	y_offset = MP_BORDER*scale;
 	x_offset = -MP_BORDER*scale;
