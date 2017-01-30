@@ -18,15 +18,16 @@ menus? open, help, quit, show/hide trace, change units, precision, change figure
 may be possible to display the vector graphics without converting to png first: http://stackoverflow.com/questions/3672847/how-to-embed-evince
 */
 
-cairo_surface_t *mp_png;  
-cairo_surface_t *trace;  
+cairo_surface_t *mp_png; //raster image of the metapost output
+cairo_surface_t *trace; //image to trace over
 cairo_t *cr;
 
-GtkWidget *darea;
-GtkWidget *info_bar;
+//status messages at bottom of window
 GtkWidget *message_label;
-GtkWidget *scrolled_window;
 
+GtkWidget *darea; //drawing area
+GtkWidget *scrolled_window; //contains darea
+//scroll adjustments (used to get/set scrollbar position)
 GtkAdjustment *hadj;
 GtkAdjustment *vadj;
 
@@ -45,7 +46,91 @@ GtkWidget *fig_mi;
 GtkWidget *next_fig_mi;
 GtkWidget *prev_fig_mi;
 
-static gboolean refresh(gpointer window);
+
+//Info bar
+void add_info_bar(GtkWidget *vbox);
+void mode_change(); //update the info message and deactivate/reactivate menu items whenever we change modes (eg start editing a path, change drawing mode, finish drawing a path, etc)
+gchar *get_info_msg(); //decides what hints/keyboard shortcuts to display in the info bar based on the mode
+
+//Drawing menu callbacks
+void curve_mode();
+void straight_mode();
+void circle_mode();
+void resume_drawing(gpointer window); //undo end_path()
+
+//Dialogs
+void show_error(gpointer window,char *fmt,char *msg);
+void show_help(gpointer window);
+void open_dialog(GtkWidget *window); //open an mp file
+
+//Get png of the metapost
+static gboolean refresh(gpointer window); //run metapost
+void get_figure(gpointer window); //convert the current figure to png
+void adjust_darea_size(); //make darea fit the new png, or new scale
+
+//Figure selection
+int get_fig_index(); //return index of the current figure within the available figures array
+void next_fig(gpointer window);
+void prev_fig(gpointer window);
+void select_figure(gpointer window);
+
+//Scrolling
+void save_scroll_position();
+void scroll_to(double x,double y);
+static gboolean scroll_to_origin();
+static gboolean maintain_scroll(GtkWidget *widget, GdkEventKey *event, gpointer user_data); //scroll back to last saved position. called whenever darea is resized (eg after zooming)
+void darea_coords(gdouble wx, gdouble wy, int *x, int *y); //translate event->x and y to darea coords, compensating for scrollbar position, and the menu bar
+bool is_off_screen(double x, double y); //used to check if we should scroll to the position of a pasted path
+
+//Drawing commands used by draw_path() etc
+void fill_circle(double centre_x, double centre_y, int r);
+void draw_circle(double centre_x, double centre_y, int r);
+void draw_point(double centre_x, double centre_y);
+void draw_bezier(double start_x, double start_y, double start_right_x, double start_right_y, double end_left_x, double end_left_y, double end_x, double end_y);
+void link_point_pair(struct point *p, struct point *q);
+
+//Copy/paste paths
+void copy_to_clipboard(char *s);
+void paste_path();
+
+//Callbacks
+static gboolean on_draw_event(GtkWidget *widget, cairo_t *this_cr, gpointer user_data);
+static gboolean button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data);
+static gboolean button_release(GtkWidget *widget, GdkEventButton *event, gpointer user_data);
+static gboolean resize(GtkWidget *widget, GdkEventKey *event, gpointer user_data);
+static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data);
+static gboolean on_motion(GtkWidget *widget, GdkEventMotion *event, gpointer user_data);
+
+//Gtk stuff
+static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox);
+static void activate (GtkApplication* app, gpointer user_data);
+static void open(GApplication *app,
+                 GFile         **files,
+                 gint          n_files,
+                 gchar        *hint,
+                 gpointer      user_data);
+//Process command-line options
+static gboolean get_unit(gchar *option_name,gchar *value,gpointer data,GError **error);
+static gboolean get_trace(gchar *option_name,gchar *value,gpointer data,GError **error);
+
+
+
+void redraw_screen() {
+	gtk_widget_queue_draw(darea);
+}
+
+/****************
+Info Bar
+****************/
+
+void add_info_bar(GtkWidget *vbox) {
+	GtkWidget *info_bar = gtk_info_bar_new ();
+	message_label = gtk_label_new (get_info_msg());
+	gtk_widget_show (message_label);
+	GtkWidget *content_area = gtk_info_bar_get_content_area (GTK_INFO_BAR (info_bar));
+	gtk_container_add (GTK_CONTAINER (content_area), message_label);
+	gtk_box_pack_end(GTK_BOX(vbox), info_bar, FALSE, TRUE, 0);
+}
 
 gchar *get_info_msg() {
 	//not mentioned: 'r' to refresh metapost, 't' to toggle trace, and 'p' to push path
@@ -98,6 +183,11 @@ void mode_change() {
 		gtk_widget_set_sensitive(resume_mi,false);
 }
 
+
+/*********************
+Drawing menu callbacks
+*********************/
+
 void curve_mode() {
 	path_mode_change(false);
 }
@@ -109,6 +199,35 @@ void circle_mode() {
 	mode=CIRCLE_MODE;
 	mode_change();
 }
+
+void resume_drawing(gpointer window) {
+	if (finished_drawing && cur_path->n > 0) {
+		finished_drawing = false;
+		cur_path->cycle = false;
+		struct point p = cur_path->points[cur_path->n-1];
+		mode = p.straight ? STRAIGHT_MODE : CURVE_MODE;
+
+		//get the coords of the pointer
+		gint wx, wy;
+		GdkDisplay *display = gdk_display_get_default ();
+		GdkDeviceManager *device_manager = gdk_display_get_device_manager (display);
+		GdkDevice *device = gdk_device_manager_get_client_pointer (device_manager);
+		gdk_window_get_device_position(gtk_widget_get_window(window),device,&wx,&wy,NULL);
+		int x,y;
+		darea_coords(wx,wy,&x,&y);
+
+		append_point(
+			pxl_to_mp_x_coord(x),
+			pxl_to_mp_y_coord(y),
+			p.straight);
+		redraw_screen();
+	}
+}
+
+
+/*********************
+Dialogs
+*********************/
 
 void show_error(gpointer window,char *fmt,char *msg) {//http://zetcode.com/gui/gtk2/gtkdialogs/
 	GtkWidget *dialog;
@@ -186,14 +305,27 @@ void open_dialog(GtkWidget *window) {
 	gtk_widget_destroy(dialog);
 }
 
-void adjust_darea_size() {
-	sketch_width  = scale*(2*MP_BORDER + cairo_image_surface_get_width(mp_png));
-	sketch_height = scale*(2*MP_BORDER + cairo_image_surface_get_height(mp_png));
-	gtk_widget_set_size_request(darea, sketch_width, sketch_height);
-	y_offset = MP_BORDER*scale;
-	x_offset = -MP_BORDER*scale;
-	pixels_per_point = scale*density/INCH;
-	redraw_screen();
+
+/**********************
+Get png of the metapost
+**********************/
+
+//rerun metapost, convert to png
+static gboolean refresh(gpointer window) {
+	save_scroll_position();
+
+	char tmp_filename[strlen(tmp_job_name)+4];
+	sprintf(tmp_filename,"%s.mp",tmp_job_name);
+	int ret = create_mp_file(mp_filename,tmp_filename);
+	if (ret == 1) 
+		show_error(window,"Couldn't open %s",mp_filename);
+	else if (ret == 2)
+		show_error(window,"Couldn't open %s.mp for writing",tmp_job_name);
+	else if (run_mpost(tmp_job_name) != 0) {
+		show_error(window,"%s","Error running metapost. See stdout for more details.");
+	} else get_figure(window);
+	mode_change(); //replace info bar message
+	return FALSE;
 }
 
 void get_figure(gpointer window) {
@@ -230,6 +362,21 @@ void get_figure(gpointer window) {
 		}
 	}
 }
+
+void adjust_darea_size() {
+	sketch_width  = scale*(2*MP_BORDER + cairo_image_surface_get_width(mp_png));
+	sketch_height = scale*(2*MP_BORDER + cairo_image_surface_get_height(mp_png));
+	gtk_widget_set_size_request(darea, sketch_width, sketch_height);
+	y_offset = MP_BORDER*scale;
+	x_offset = -MP_BORDER*scale;
+	pixels_per_point = scale*density/INCH;
+	redraw_screen();
+}
+
+
+/**********************
+Figure selection
+**********************/
 
 void select_figure(gpointer window) {
 	GtkWidget *dialog, *content_area, *combo;
@@ -279,28 +426,67 @@ void next_fig(gpointer window) {
 	fig_num = figures[(get_fig_index() + 1)%n_fig];
 	get_figure(window);
 	mode_change();
+	scroll_to_origin();
 }
 void prev_fig(gpointer window) {
 	fig_num = figures[(get_fig_index() + n_fig - 1)%n_fig];
 	get_figure(window);
 	mode_change();
+	scroll_to_origin();
 }
 
-//rerun metapost, convert to png
-static gboolean refresh(gpointer window) {
-	char tmp_filename[strlen(tmp_job_name)+4];
-	sprintf(tmp_filename,"%s.mp",tmp_job_name);
-	int ret = create_mp_file(mp_filename,tmp_filename);
-	if (ret == 1) 
-		show_error(window,"Couldn't open %s",mp_filename);
-	else if (ret == 2)
-		show_error(window,"Couldn't open %s.mp for writing",tmp_job_name);
-	else if (run_mpost(tmp_job_name) != 0) {
-		show_error(window,"%s","Error running metapost. See stdout for more details.");
-	} else get_figure(window);
-	mode_change(); //replace info bar message
+
+/**********************
+Scrolling
+**********************/
+
+void save_scroll_position() {
+	//save mp coords of centre of the screen (adjust_darea_size scrolls to the last saved position)
+	scroll_centre_x = pxl_to_mp_x_coord(gtk_adjustment_get_value(hadj) + win_width/2);
+	scroll_centre_y = pxl_to_mp_y_coord(gtk_adjustment_get_value(vadj) + win_height/2);
+}
+
+//centre given mp coords in window
+void scroll_to(double x,double y) {
+	gtk_adjustment_set_value(hadj,mp_x_coord_to_pxl(x) - win_width/2);
+	gtk_adjustment_set_value(vadj,mp_y_coord_to_pxl(y) - win_height/2);
+}
+static gboolean scroll_to_origin() {
+	if (!mp_png || win_width == 0) return TRUE;
+	scroll_to(0,0);
 	return FALSE;
 }
+//when zooming in, we want the centre of the window to stay fixed
+static gboolean maintain_scroll(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
+	scroll_to(scroll_centre_x, scroll_centre_y);
+	return FALSE;
+}
+
+//translate event->x and y to drawing area coords
+void darea_coords(gdouble wx, gdouble wy, int *x, int *y) {
+	//compensate for scrollbar position
+	*x = wx + gtk_adjustment_get_value(hadj);
+	*y = wy + gtk_adjustment_get_value(vadj);
+
+	//compensate for menubar
+	GtkAllocation alloc;
+	gtk_widget_get_allocation(scrolled_window, &alloc);
+	*y-=alloc.y;
+}
+
+bool is_off_screen(double x, double y) {
+	int screen_x = mp_x_coord_to_pxl(x) - gtk_adjustment_get_value(hadj);
+	int screen_y = mp_y_coord_to_pxl(y) - gtk_adjustment_get_value(vadj);
+	GtkAllocation alloc;
+	GtkWidget *child = gtk_bin_get_child(GTK_BIN(scrolled_window));
+	gtk_widget_get_allocation(child, &alloc);
+	return (screen_x < 0 || screen_x > alloc.width || screen_y < 0 || screen_y > alloc.height);
+}
+
+
+/***************************************
+Drawing commands used by draw_path() etc
+***************************************/
 
 void fill_circle(double centre_x, double centre_y, int r) {
 	cairo_new_sub_path(cr);
@@ -360,6 +546,12 @@ void link_point_pair(struct point *p, struct point *q) {
 	}
 	cairo_stroke(cr);
 }
+
+
+/**********************
+Callbacks
+**********************/
+
 static gboolean on_draw_event(GtkWidget *widget, cairo_t *this_cr, gpointer user_data) {
 	cr = this_cr; //make it global. Otherwise I'd have to pass it to draw_path which would no longer be common between the xlib and gtk versions
 
@@ -412,18 +604,6 @@ static gboolean button_press(GtkWidget *widget, GdkEventButton *event, gpointer 
 	if (event->button == 1 && edit) dragging_point = true;
 	return FALSE;
 }
-
-//translate event->x and y to drawing area coords
-void darea_coords(gdouble wx, gdouble wy, int *x, int *y) {
-	//compensate for scrollbar position
-	*x = wx + gtk_adjustment_get_value(hadj);
-	*y = wy + gtk_adjustment_get_value(vadj);
-
-	//compensate for menubar
-	GtkAllocation alloc;
-	gtk_widget_get_allocation(scrolled_window, &alloc);
-	*y-=alloc.y;
-}
 static gboolean button_release(GtkWidget *widget, GdkEventButton *event, gpointer user_data) {
 	if (event->button == 1) {
 		int x,y;
@@ -433,64 +613,9 @@ static gboolean button_release(GtkWidget *widget, GdkEventButton *event, gpointe
 	return FALSE;
 }
 
-void redraw_screen() {
-	gtk_widget_queue_draw(darea);
-}
-
 static gboolean resize(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
 	gtk_window_get_size(GTK_WINDOW(widget), &win_width, &win_height);
 	return FALSE;
-}
-
-//centre given mp coords in window
-void scroll_to(double x,double y) {
-	gtk_adjustment_set_value(hadj,mp_x_coord_to_pxl(x) - win_width/2);
-	gtk_adjustment_set_value(vadj,mp_y_coord_to_pxl(y) - win_height/2);
-}
-static gboolean scroll_to_origin() {
-	if (!mp_png || win_width == 0) return TRUE;
-	scroll_to(0,0);
-	return FALSE;
-}
-//when zooming in, we want the centre of the window to stay fixed
-static gboolean maintain_scroll(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
-	scroll_to(scroll_centre_x, scroll_centre_y);
-	return FALSE;
-}
-
-void copy_to_clipboard(char *s) {
-	gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD), s, -1);
-
-	//Show it in the info bar too
-	char msg[strlen(s) + strlen("Copied to clipboard: ") + 1];
-	sprintf(msg,"Copied to clipboard: %s",s);
-	gtk_label_set_text(GTK_LABEL (message_label), msg);
-}
-
-bool is_off_screen(double x, double y) {
-	int screen_x = mp_x_coord_to_pxl(x) - gtk_adjustment_get_value(hadj);
-	int screen_y = mp_y_coord_to_pxl(y) - gtk_adjustment_get_value(vadj);
-	GtkAllocation alloc;
-	GtkWidget *child = gtk_bin_get_child(GTK_BIN(scrolled_window));
-	gtk_widget_get_allocation(child, &alloc);
-	return (screen_x < 0 || screen_x > alloc.width || screen_y < 0 || screen_y > alloc.height);
-}
-
-void push_path() {
-	gchar *text = gtk_clipboard_wait_for_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
-	if (text != NULL) {
-		string_to_path(text);
-		finished_drawing = true;
-		if (cur_path->n == 0) {
-			gtk_label_set_text (GTK_LABEL (message_label), "Invalid path");
-		} else {
-			struct point fp = cur_path->points[0]; //first point
-			if (is_off_screen(fp.x,fp.y))
-				scroll_to(fp.x,fp.y);
-			redraw_screen();
-			mode_change();
-		}
-	}
 }
 
 static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
@@ -520,18 +645,12 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 				}
 				break;
 			case GDK_KEY_Z: //zoom out
-				//remember where we want to scroll to
-				scroll_centre_x = pxl_to_mp_x_coord(gtk_adjustment_get_value(hadj) + win_width/2);
-				scroll_centre_y = pxl_to_mp_y_coord(gtk_adjustment_get_value(vadj) + win_height/2);
-
+				save_scroll_position(); //remember where we want to scroll to
 				scale /= 1.5;
 				adjust_darea_size();
 				break;
 			case GDK_KEY_z: //zoom
-				//remember where we want to scroll to
-				scroll_centre_x = pxl_to_mp_x_coord(gtk_adjustment_get_value(hadj) + win_width/2);
-				scroll_centre_y = pxl_to_mp_y_coord(gtk_adjustment_get_value(vadj) + win_height/2);
-
+				save_scroll_position(); //remember where we want to scroll to
 				scale *= 1.5;
 				adjust_darea_size();
 				break;
@@ -572,7 +691,7 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 				break;
 			case GDK_KEY_v:
 				if (event->state & GDK_CONTROL_MASK) { //ctrl-v paste
-					push_path();
+					paste_path();
 				}
 				break;
 			case GDK_KEY_c:
@@ -591,7 +710,7 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 				output_path();
 				break;
 			case GDK_KEY_p: ; //push
-				push_path();
+				paste_path();
 				break;
 		}
 	}
@@ -606,29 +725,41 @@ static gboolean on_motion(GtkWidget *widget, GdkEventMotion *event, gpointer use
 	return FALSE;
 }
 
-void resume_drawing(gpointer window) {
-	if (finished_drawing && cur_path->n > 0) {
-		finished_drawing = false;
-		cur_path->cycle = false;
-		struct point p = cur_path->points[cur_path->n-1];
-		mode = p.straight ? STRAIGHT_MODE : CURVE_MODE;
 
-		//get the coords of the pointer
-		gint wx, wy;
-		GdkDisplay *display = gdk_display_get_default ();
-		GdkDeviceManager *device_manager = gdk_display_get_device_manager (display);
-		GdkDevice *device = gdk_device_manager_get_client_pointer (device_manager);
-		gdk_window_get_device_position(gtk_widget_get_window(window),device,&wx,&wy,NULL);
-		int x,y;
-		darea_coords(wx,wy,&x,&y);
+/**********************
+Copy/paste paths
+**********************/
 
-		append_point(
-			pxl_to_mp_x_coord(x),
-			pxl_to_mp_y_coord(y),
-			p.straight);
-		redraw_screen();
+void copy_to_clipboard(char *s) {
+	gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD), s, -1);
+
+	//Show it in the info bar too
+	char msg[strlen(s) + strlen("Copied to clipboard: ") + 1];
+	sprintf(msg,"Copied to clipboard: %s",s);
+	gtk_label_set_text(GTK_LABEL (message_label), msg);
+}
+
+void paste_path() {
+	gchar *text = gtk_clipboard_wait_for_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
+	if (text != NULL) {
+		string_to_path(text);
+		finished_drawing = true;
+		if (cur_path->n == 0) {
+			gtk_label_set_text (GTK_LABEL (message_label), "Invalid path");
+		} else {
+			struct point fp = cur_path->points[0]; //first point
+			if (is_off_screen(fp.x,fp.y))
+				scroll_to(fp.x,fp.y);
+			redraw_screen();
+			mode_change();
+		}
 	}
 }
+
+
+/**********************
+Gtk stuff
+**********************/
 
 static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox) {
 	GtkWidget *menubar = gtk_menu_bar_new();
@@ -713,29 +844,7 @@ static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox)
 	gtk_box_pack_start(GTK_BOX(vbox), menubar, FALSE, FALSE, 0);
 }
 
-static void activate (GtkApplication* app, gpointer user_data) {
-	GtkWidget *window;
-
-	initialise();
-
-	window = gtk_application_window_new (app);
-	gtk_window_set_title (GTK_WINDOW (window), "MPSketch");
-	gtk_window_set_default_size (GTK_WINDOW (window), 200, 200);
-	gtk_widget_add_events(window, GDK_BUTTON_PRESS_MASK);
-	gtk_widget_add_events(window, GDK_POINTER_MOTION_MASK);
-	gtk_widget_add_events(window, GDK_BUTTON_RELEASE_MASK);
-	gtk_widget_add_events(window, GDK_SCROLL_MASK);
-	g_signal_connect(window, "button-press-event",		G_CALLBACK(button_press),	NULL);
-	g_signal_connect(window, "button-release-event",	G_CALLBACK(button_release), NULL);
-	g_signal_connect(window, "key-press-event",			G_CALLBACK(key_press),		NULL);
-	g_signal_connect(window, "motion-notify-event",		G_CALLBACK(on_motion),		NULL);
-	g_signal_connect(window, "configure-event",			G_CALLBACK(resize),			NULL);
-
-	GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-	gtk_container_add(GTK_CONTAINER(window), vbox);
-
-	setup_menus(app,window,vbox);
-
+void setup_darea(GtkWidget *vbox) {
 	scrolled_window = gtk_scrolled_window_new (NULL, NULL);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolled_window),
 		GTK_POLICY_AUTOMATIC, 
@@ -749,13 +858,37 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	GtkWidget *child = gtk_bin_get_child(GTK_BIN(scrolled_window));
 	hadj = gtk_scrollable_get_hadjustment(GTK_SCROLLABLE(child));
 	vadj = gtk_scrollable_get_vadjustment(GTK_SCROLLABLE(child));
+}
 
-	info_bar = gtk_info_bar_new ();
-	message_label = gtk_label_new (get_info_msg());
-	gtk_widget_show (message_label);
-	GtkWidget *content_area = gtk_info_bar_get_content_area (GTK_INFO_BAR (info_bar));
-	gtk_container_add (GTK_CONTAINER (content_area), message_label);
-	gtk_box_pack_end(GTK_BOX(vbox), info_bar, FALSE, TRUE, 0);
+static void activate (GtkApplication* app, gpointer user_data) {
+	GtkWidget *window;
+
+	initialise();
+
+	window = gtk_application_window_new (app);
+	gtk_window_set_title (GTK_WINDOW (window), "MPSketch");
+	gtk_window_set_default_size (GTK_WINDOW (window), 500, 500);
+
+	gtk_widget_add_events(window, 
+		GDK_BUTTON_PRESS_MASK | 
+		GDK_POINTER_MOTION_MASK |
+		GDK_BUTTON_RELEASE_MASK |
+		GDK_SCROLL_MASK);
+
+	g_signal_connect(window, "button-press-event",		G_CALLBACK(button_press),	NULL);
+	g_signal_connect(window, "button-release-event",	G_CALLBACK(button_release), NULL);
+	g_signal_connect(window, "key-press-event",			G_CALLBACK(key_press),		NULL);
+	g_signal_connect(window, "motion-notify-event",		G_CALLBACK(on_motion),		NULL);
+	g_signal_connect(window, "configure-event",			G_CALLBACK(resize),			NULL);
+
+	GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+	gtk_container_add(GTK_CONTAINER(window), vbox);
+
+	setup_menus(app,window,vbox);
+
+	setup_darea(vbox);
+
+	add_info_bar(vbox);
 
 	gtk_widget_show_all (window);
 	density = 100;
@@ -782,6 +915,7 @@ static void open(GApplication *app,
 	}
 }
 
+//Process command-line options
 static gboolean get_unit(gchar *option_name,gchar *value,gpointer data,GError **error) {
 	bool valid;
 	unit = string_to_bp(value,&valid);
