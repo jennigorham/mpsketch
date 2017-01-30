@@ -291,6 +291,9 @@ void open_dialog(GtkWidget *window) {
 	res = gtk_dialog_run (GTK_DIALOG (dialog));
 	if (res == GTK_RESPONSE_ACCEPT) {
 		g_free(mp_filename);
+		cairo_surface_destroy(mp_png);
+		mp_png = NULL; //needs to be NULL so that save_scroll_position() will choose the origin
+
 		mp_filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER (dialog));
 
 		//change to the directory containing mp_filename so that mpost doesn't fail if they input a local file
@@ -440,10 +443,15 @@ void prev_fig(gpointer window) {
 Scrolling
 **********************/
 
+//save mp coords of centre of the screen (adjust_darea_size scrolls to the last saved position)
 void save_scroll_position() {
-	//save mp coords of centre of the screen (adjust_darea_size scrolls to the last saved position)
-	scroll_centre_x = pxl_to_mp_x_coord(gtk_adjustment_get_value(hadj) + win_width/2);
-	scroll_centre_y = pxl_to_mp_y_coord(gtk_adjustment_get_value(vadj) + win_height/2);
+	if (mp_png) {
+		scroll_centre_x = pxl_to_mp_x_coord(gtk_adjustment_get_value(hadj) + win_width/2);
+		scroll_centre_y = pxl_to_mp_y_coord(gtk_adjustment_get_value(vadj) + win_height/2);
+	} else {
+		scroll_centre_x = 0;
+		scroll_centre_y = 0;
+	}
 }
 
 //centre given mp coords in window
