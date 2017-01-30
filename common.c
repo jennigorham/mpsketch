@@ -56,16 +56,18 @@ double pxl_to_mp_y_coord(int y) {
 }
 
 void output_path() {
-	char *s = path_to_string();
-	if (s == NULL) {
-		fprintf(stderr,"Couldn't allocate memory.\n");
-	} else {
-		copy_to_clipboard(s);
-		if (cur_path->n > 1 || cur_path->n == -1)
-			printf("draw %s;\n",s);
-		else if (cur_path->n == 1)
-			printf("drawdot %s;\n",s);
-		free(s);
+	if (cur_path->n != 0) {
+		char *s = path_to_string();
+		if (s == NULL) {
+			fprintf(stderr,"Couldn't allocate memory.\n");
+		} else {
+			copy_to_clipboard(s);
+			if (cur_path->n == 1)
+				printf("drawdot %s;\n",s);
+			else
+				printf("draw %s;\n",s);
+			free(s);
+		}
 	}
 }
 
