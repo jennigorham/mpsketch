@@ -316,6 +316,10 @@ Get png of the metapost
 //rerun metapost, convert to png
 static gboolean refresh(gpointer window) {
 	save_scroll_position();
+	//these values will be overwritten if running metapost succeeds
+	n_fig=0;
+	cairo_surface_destroy(mp_png);
+	mp_png = NULL;
 
 	char tmp_filename[strlen(tmp_job_name)+4];
 	sprintf(tmp_filename,"%s.mp",tmp_job_name);
@@ -327,7 +331,20 @@ static gboolean refresh(gpointer window) {
 	else if (run_mpost(tmp_job_name) != 0) {
 		show_error(window,"%s","Error running metapost. See stdout for more details.");
 	} else get_figure(window);
+
+	//if there's only one fig then we don't need the menu items for changing figs
+	if (n_fig > 1) {
+		gtk_widget_set_sensitive(fig_mi,true);
+		gtk_widget_set_sensitive(next_fig_mi,true);
+		gtk_widget_set_sensitive(prev_fig_mi,true);
+	} else {
+		gtk_widget_set_sensitive(fig_mi,false);
+		gtk_widget_set_sensitive(next_fig_mi,false);
+		gtk_widget_set_sensitive(prev_fig_mi,false);
+	}
+
 	mode_change(); //replace info bar message
+	adjust_darea_size();
 	return FALSE;
 }
 
@@ -350,25 +367,14 @@ void get_figure(gpointer window) {
 	} else {
 		char png[strlen(tmp_job_name)+5];
 		sprintf(png,"%s.png",tmp_job_name);
-		cairo_surface_t *surface = cairo_image_surface_create_from_png(png);
-		if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS)
+		mp_png = cairo_image_surface_create_from_png(png);
+		if (cairo_surface_status(mp_png) != CAIRO_STATUS_SUCCESS) {
 			show_error(window,"Couldn't load %s",png);
-		else {
 			cairo_surface_destroy(mp_png);
-			mp_png = surface;
-			adjust_darea_size();
+			mp_png = NULL;
 		}
 	}
-	//if there's only one fig then we don't need the menu items for changing figs
-	if (n_fig > 1) {
-		gtk_widget_set_sensitive(fig_mi,true);
-		gtk_widget_set_sensitive(next_fig_mi,true);
-		gtk_widget_set_sensitive(prev_fig_mi,true);
-	} else {
-		gtk_widget_set_sensitive(fig_mi,false);
-		gtk_widget_set_sensitive(next_fig_mi,false);
-		gtk_widget_set_sensitive(prev_fig_mi,false);
-	}
+	adjust_darea_size();
 }
 
 void adjust_darea_size() {
@@ -377,12 +383,29 @@ void adjust_darea_size() {
 	if (mp_png) {
 		w = cairo_image_surface_get_width(mp_png);
 		h = cairo_image_surface_get_height(mp_png);
+	} else {
+		ll_x = 0; ll_y = 0; //put origin at centre of darea
 	}
-	sketch_width  = scale*(2*MP_BORDER + w);
-	sketch_height = scale*(2*MP_BORDER + h);
-	gtk_widget_set_size_request(darea, sketch_width, sketch_height);
 	y_offset = MP_BORDER*scale;
 	x_offset = -MP_BORDER*scale;
+	sketch_width  = scale*(2*MP_BORDER + w);
+	sketch_height = scale*(2*MP_BORDER + h);
+
+	//if window is bigger than darea, grow it to fit the window
+	GtkAllocation alloc;
+	gtk_widget_get_allocation(scrolled_window, &alloc);
+	//sketch_width should be a teensy bit less than alloc.width to leave room for scrollbars
+	int scroll_bar_width = 20; //Enough space to fit scrollbars. Exact value doesn't really matter but should be smaller than MP_BORDER or mp_png could get clipped
+	if (alloc.width - scroll_bar_width > sketch_width) {
+		x_offset -= (alloc.width - sketch_width)/2;
+		sketch_width = alloc.width - scroll_bar_width;
+	}
+	if (alloc.height - scroll_bar_width > sketch_height) {
+		y_offset += (alloc.height - (int) sketch_height - scroll_bar_width)/2;
+		sketch_height = alloc.height - scroll_bar_width;
+	}
+
+	gtk_widget_set_size_request(darea, sketch_width, sketch_height);
 	pixels_per_point = scale*density/INCH;
 	redraw_screen();
 }
@@ -582,7 +605,7 @@ static gboolean on_draw_event(GtkWidget *widget, cairo_t *this_cr, gpointer user
 	}
 
 	if (mp_png) {
-		cairo_set_source_surface(cr, mp_png, MP_BORDER-1, MP_BORDER-1); //since adding the scrolled_window, it was off by 1
+		cairo_set_source_surface(cr, mp_png, -x_offset/scale -1, y_offset/scale); //since adding the scrolled_window, it was off by 1
 
 		//scale it
 		cairo_pattern_t *pattern = cairo_get_source(cr);
@@ -634,6 +657,7 @@ static gboolean button_release(GtkWidget *widget, GdkEventButton *event, gpointe
 
 static gboolean resize(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
 	gtk_window_get_size(GTK_WINDOW(widget), &win_width, &win_height);
+	adjust_darea_size();
 	return FALSE;
 }
 

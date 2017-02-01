@@ -29,8 +29,8 @@ int mode; //drawing mode
 bool finished_drawing; //if true then we're ready to start drawing another path or circle.
 
 //for scrolling
-int x_offset;
-int y_offset;
+double x_offset;
+double y_offset;
 
 double pixels_per_point;
 
