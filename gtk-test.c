@@ -174,9 +174,12 @@ gchar *get_info_msg() {
 
 void mode_change() {
 	char *msg = get_info_msg();
-	char s[strlen(msg) + 10];
-	snprintf(s,sizeof(s),"Fig%d | %s",fig_num,msg);
-	gtk_label_set_text (GTK_LABEL (message_label), s);
+	if (mp_png) {
+		char s[strlen(msg) + 10];
+		snprintf(s,sizeof(s),"Fig%d | %s",fig_num,msg);
+		gtk_label_set_text (GTK_LABEL (message_label), s);
+	} else
+		gtk_label_set_text (GTK_LABEL (message_label), msg);
 
 	//disable resume drawing menu item unless we have a resumable path
 	if (!finished_drawing || cur_path->n < 1)
