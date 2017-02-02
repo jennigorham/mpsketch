@@ -127,8 +127,8 @@ void click_point(int x, int y) {
 
 void end_path() {
 	cur_path->n--; //remove extra point under cursor. If circle, makes n=-1
-	output_path();
 	finished_drawing=true;
+	output_path();
 	redraw_screen();
 }
 

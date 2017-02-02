@@ -42,6 +42,7 @@ double scale;
 
 //menu items that need to be deactivated/reactivated
 GtkWidget *resume_mi;
+GtkWidget *end_mi;
 GtkWidget *fig_mi;
 GtkWidget *next_fig_mi;
 GtkWidget *prev_fig_mi;
@@ -188,6 +189,9 @@ void mode_change() {
 	//disable resume drawing menu item unless we have a resumable path
 	if (!finished_drawing || cur_path->n < 1)
 		gtk_widget_set_sensitive(resume_mi,false);
+	//activate "End path" menu item if we're currently drawing a path
+	if (!finished_drawing && mode != CIRCLE_MODE)
+		gtk_widget_set_sensitive(end_mi,true);
 }
 
 
@@ -228,6 +232,7 @@ void resume_drawing(gpointer window) {
 			pxl_to_mp_y_coord(y),
 			p.straight);
 		redraw_screen();
+		mode_change();
 	}
 }
 
@@ -689,7 +694,7 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 	///usr/include/gtk-3.0/gdk/gdkkeysyms.h
 	if (!dragging_point) {
 		switch(event->keyval) {
-			case GDK_KEY_Escape:
+			/*case GDK_KEY_Escape:
 				if (finished_drawing) { //clear
 					cur_path->n = 0;
 					redraw_screen();
@@ -698,7 +703,7 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 					//activate the resume drawing menu item
 					if (mode != CIRCLE_MODE)
 						gtk_widget_set_sensitive(resume_mi,true);
-				break;
+				break;*/
 			case GDK_KEY_Return: //cycle
 				if (!finished_drawing) {
 					cur_path->cycle = true;
@@ -784,6 +789,13 @@ void copy_to_clipboard(char *s) {
 	char msg[strlen(s) + strlen("Copied to clipboard: ") + 1];
 	sprintf(msg,"Copied to clipboard: %s",s);
 	gtk_label_set_text(GTK_LABEL (message_label), msg);
+
+	//activate resume menu item after ending a path
+	if (mode != CIRCLE_MODE)
+		gtk_widget_set_sensitive(resume_mi,true);
+	//deactivate "End path" menu item
+	if (finished_drawing)
+		gtk_widget_set_sensitive(end_mi,false);
 }
 
 void paste_path() {
@@ -886,6 +898,12 @@ static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox)
 	GtkWidget *sketch_menu = gtk_menu_new();
 	GtkWidget *sketch_mi = gtk_menu_item_new_with_label("Sketch");
 	gtk_menu_item_set_submenu(GTK_MENU_ITEM(sketch_mi), sketch_menu);
+
+	end_mi = gtk_menu_item_new_with_label("End path");
+	gtk_menu_shell_append(GTK_MENU_SHELL(sketch_menu), end_mi);
+	g_signal_connect_swapped(G_OBJECT(end_mi), "activate", G_CALLBACK (end_path), window);
+	gtk_widget_add_accelerator(end_mi, "activate", accel_group, GDK_KEY_Escape, 0, GTK_ACCEL_VISIBLE);
+	gtk_widget_set_sensitive(end_mi,false);
 
 	resume_mi = gtk_menu_item_new_with_label("Resume drawing path");
 	gtk_menu_shell_append(GTK_MENU_SHELL(sketch_menu), resume_mi);
