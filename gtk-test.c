@@ -82,6 +82,10 @@ static gboolean maintain_scroll(GtkWidget *widget, GdkEventKey *event, gpointer 
 void darea_coords(gdouble wx, gdouble wy, int *x, int *y); //translate event->x and y to darea coords, compensating for scrollbar position, and the menu bar
 bool is_off_screen(double x, double y); //used to check if we should scroll to the position of a pasted path
 
+//Zooming
+void zoom_in();
+void zoom_out();
+
 //Drawing commands used by draw_path() etc
 void fill_circle(double centre_x, double centre_y, int r);
 void draw_circle(double centre_x, double centre_y, int r);
@@ -529,6 +533,23 @@ bool is_off_screen(double x, double y) {
 }
 
 
+/**********************
+Zooming
+**********************/
+
+void zoom_in() {
+	save_scroll_position();
+	scale *= 1.5;
+	adjust_darea_size();
+}
+
+void zoom_out() {
+	save_scroll_position();
+	scale /= 1.5;
+	adjust_darea_size();
+}
+
+
 /***************************************
 Drawing commands used by draw_path() etc
 ***************************************/
@@ -690,16 +711,6 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 					redraw_screen();
 				}
 				break;
-			case GDK_KEY_Z: //zoom out
-				save_scroll_position(); //remember where we want to scroll to
-				scale /= 1.5;
-				adjust_darea_size();
-				break;
-			case GDK_KEY_z: //zoom
-				save_scroll_position(); //remember where we want to scroll to
-				scale *= 1.5;
-				adjust_darea_size();
-				break;
 			case GDK_KEY_i: //insert point before edit_point
 				if (edit && edit_point >= 0) {
 					point_before(edit_point);
@@ -856,6 +867,21 @@ static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox)
 	g_signal_connect_swapped(G_OBJECT(paste_mi), "activate", G_CALLBACK (paste_path), window);
 	gtk_widget_add_accelerator(paste_mi, "activate", accel_group, GDK_KEY_v, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
 
+	//View menu
+	GtkWidget *view_menu = gtk_menu_new();
+	GtkWidget *view_mi = gtk_menu_item_new_with_label("View");
+	gtk_menu_item_set_submenu(GTK_MENU_ITEM(view_mi), view_menu);
+
+	GtkWidget *zoom_in_mi = gtk_menu_item_new_with_label("Zoom in");
+	gtk_menu_shell_append(GTK_MENU_SHELL(view_menu), zoom_in_mi);
+	g_signal_connect_swapped(G_OBJECT(zoom_in_mi), "activate", G_CALLBACK (zoom_in), window);
+	gtk_widget_add_accelerator(zoom_in_mi, "activate", accel_group, GDK_KEY_plus, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+
+	GtkWidget *zoom_out_mi = gtk_menu_item_new_with_label("Zoom out");
+	gtk_menu_shell_append(GTK_MENU_SHELL(view_menu), zoom_out_mi);
+	g_signal_connect_swapped(G_OBJECT(zoom_out_mi), "activate", G_CALLBACK (zoom_out), window);
+	gtk_widget_add_accelerator(zoom_out_mi, "activate", accel_group, GDK_KEY_minus, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+
 	//Sketch menu
 	GtkWidget *sketch_menu = gtk_menu_new();
 	GtkWidget *sketch_mi = gtk_menu_item_new_with_label("Sketch");
@@ -892,6 +918,7 @@ static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox)
 
 	gtk_menu_shell_append(GTK_MENU_SHELL(menubar), file_mi);
 	gtk_menu_shell_append(GTK_MENU_SHELL(menubar), edit_mi);
+	gtk_menu_shell_append(GTK_MENU_SHELL(menubar), view_mi);
 	gtk_menu_shell_append(GTK_MENU_SHELL(menubar), sketch_mi);
 	gtk_box_pack_start(GTK_BOX(vbox), menubar, FALSE, FALSE, 0);
 }
