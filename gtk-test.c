@@ -131,6 +131,7 @@ Info Bar
 void add_info_bar(GtkWidget *vbox) {
 	GtkWidget *info_bar = gtk_info_bar_new ();
 	message_label = gtk_label_new (get_info_msg());
+	gtk_label_set_ellipsize(GTK_LABEL(message_label),PANGO_ELLIPSIZE_END);
 	gtk_widget_show (message_label);
 	GtkWidget *content_area = gtk_info_bar_get_content_area (GTK_INFO_BAR (info_bar));
 	gtk_container_add (GTK_CONTAINER (content_area), message_label);
