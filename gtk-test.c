@@ -735,16 +735,6 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 					g_idle_add(refresh,GTK_WINDOW(widget));
 				}
 				break;
-			case GDK_KEY_v:
-				if (event->state & GDK_CONTROL_MASK) { //ctrl-v paste
-					paste_path();
-				}
-				break;
-			case GDK_KEY_c:
-				if (event->state & GDK_CONTROL_MASK) { //ctrl-c copy
-					output_path();
-				}
-				break;
 			case GDK_KEY_x:
 				if (event->state & GDK_CONTROL_MASK) { //ctrl-x cut
 					output_path();
@@ -851,6 +841,21 @@ static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox)
 	g_signal_connect_swapped(G_OBJECT(quit_mi), "activate", G_CALLBACK (g_application_quit), G_APPLICATION(app));
 	gtk_widget_add_accelerator(quit_mi, "activate", accel_group, GDK_KEY_q, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
 
+	//Edit menu
+	GtkWidget *edit_menu = gtk_menu_new();
+	GtkWidget *edit_mi = gtk_menu_item_new_with_label("Edit");
+	gtk_menu_item_set_submenu(GTK_MENU_ITEM(edit_mi), edit_menu);
+
+	GtkWidget *copy_mi = gtk_menu_item_new_with_label("Copy path");
+	gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu), copy_mi);
+	g_signal_connect_swapped(G_OBJECT(copy_mi), "activate", G_CALLBACK (output_path), window);
+	gtk_widget_add_accelerator(copy_mi, "activate", accel_group, GDK_KEY_c, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+
+	GtkWidget *paste_mi = gtk_menu_item_new_with_label("Paste path");
+	gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu), paste_mi);
+	g_signal_connect_swapped(G_OBJECT(paste_mi), "activate", G_CALLBACK (paste_path), window);
+	gtk_widget_add_accelerator(paste_mi, "activate", accel_group, GDK_KEY_v, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+
 	//Sketch menu
 	GtkWidget *sketch_menu = gtk_menu_new();
 	GtkWidget *sketch_mi = gtk_menu_item_new_with_label("Sketch");
@@ -886,6 +891,7 @@ static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox)
 
 
 	gtk_menu_shell_append(GTK_MENU_SHELL(menubar), file_mi);
+	gtk_menu_shell_append(GTK_MENU_SHELL(menubar), edit_mi);
 	gtk_menu_shell_append(GTK_MENU_SHELL(menubar), sketch_mi);
 	gtk_box_pack_start(GTK_BOX(vbox), menubar, FALSE, FALSE, 0);
 }
