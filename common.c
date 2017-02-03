@@ -179,7 +179,7 @@ void pointer_move(int x,int y) {
 			}
 		}
 		//redraw screen if edit or edit_point have changed
-		if (found_point != edit || edit_point != i) {
+		if (found_point != edit || (edit && edit_point != i)) {
 			edit = found_point;
 			edit_point = i;
 			mode_change(); //for gtk to update info bar
