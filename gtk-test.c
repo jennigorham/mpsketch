@@ -34,8 +34,10 @@ GtkAdjustment *vadj;
 gint win_width,win_height;
 
 //mp coords of centre of window
-double scroll_centre_x;
-double scroll_centre_y;
+double scroll_centre_x = 0;
+double scroll_centre_y = 0;
+//when scrollbar position changes ("value-changed" event for hadj,vadj), we save the new scroll_centre_x, scroll_centre_y, but we don't want that to be triggered when darea changes size, so we need to "lock" the scrollbar position at the start of adjust_darea_size and release it at the end (in maintain_scroll)
+bool scrollbar_lock = false;
 
 //scale of mp_png
 double scale;
@@ -76,10 +78,11 @@ void prev_fig(gpointer window);
 void select_figure(gpointer window);
 
 //Scrolling
+//When we zoom in/out, and when the window resizes, we want what was at the centre of the window to stay there, so we need to record where we were (with save_scroll_position, triggered whenever the scrollbars change position), and scroll back to it afterwards (with maintain_scroll, triggered at the end of adjust_darea_size)
 void save_scroll_position();
 void scroll_to(double x,double y);
 static gboolean scroll_to_origin();
-static gboolean maintain_scroll(GtkWidget *widget, GdkEventKey *event, gpointer user_data); //scroll back to last saved position. called whenever darea is resized (eg after zooming)
+static gboolean maintain_scroll(); //scroll back to last saved position. called whenever darea is resized (eg after zooming)
 void darea_coords(gdouble wx, gdouble wy, int *x, int *y); //translate event->x and y to darea coords, compensating for scrollbar position, and the menu bar
 bool is_off_screen(double x, double y); //used to check if we should scroll to the position of a pasted path
 
@@ -328,7 +331,6 @@ Get png of the metapost
 
 //rerun metapost, convert to png
 static gboolean refresh(gpointer window) {
-	save_scroll_position();
 	//these values will be overwritten if running metapost succeeds
 	n_fig=0;
 	cairo_surface_destroy(mp_png);
@@ -391,6 +393,9 @@ void get_figure(gpointer window) {
 }
 
 void adjust_darea_size() {
+	scrollbar_lock = true; //stop save_scroll_position from running before maintain_scroll
+	unsigned int old_sketch_width = sketch_width;
+	unsigned int old_sketch_height = sketch_height;
 	int w = 0;
 	int h = 0;
 	if (mp_png) {
@@ -405,21 +410,26 @@ void adjust_darea_size() {
 	sketch_height = scale*(2*MP_BORDER + h);
 
 	//if window is bigger than darea, grow it to fit the window
-	GtkAllocation alloc;
-	gtk_widget_get_allocation(scrolled_window, &alloc);
-	//sketch_width should be a teensy bit less than alloc.width to leave room for scrollbars
-	int scroll_bar_width = 20; //Enough space to fit scrollbars. Exact value doesn't really matter but should be smaller than MP_BORDER or mp_png could get clipped
-	if (alloc.width - scroll_bar_width > sketch_width) {
-		x_offset -= (alloc.width - sketch_width)/2;
-		sketch_width = alloc.width - scroll_bar_width;
+	//height and width available to the darea calculated from window dimensions minus enough space for scrollbars, infobar, menubar. If we instead use the scrolled_window dimensions as the available height and width then things will jump around when the infobar changes size
+	int avail_height = win_height - 80;
+	int avail_width = win_width - 20;
+	if (avail_width > (int) sketch_width) {
+		x_offset -= (win_width - sketch_width)/2;
+		sketch_width = avail_width;
 	}
-	if (alloc.height - scroll_bar_width > sketch_height) {
-		y_offset += (alloc.height - (int) sketch_height - scroll_bar_width)/2;
-		sketch_height = alloc.height - scroll_bar_width;
+	if (avail_height > (int) sketch_height) {
+		y_offset += (avail_height - sketch_height)/2;
+		sketch_height = avail_height;
 	}
 
-	gtk_widget_set_size_request(darea, sketch_width, sketch_height);
 	pixels_per_point = scale*density/INCH;
+
+	//make sure maintain_scroll is run. It's triggered by the darea "size-allocate" event, which won't run if sketch_width and sketch_height are the same as before
+	if (sketch_height == old_sketch_height && sketch_width == old_sketch_width)
+		maintain_scroll();
+	else
+		gtk_widget_set_size_request(darea, sketch_width, sketch_height);
+
 	redraw_screen();
 }
 
@@ -492,28 +502,38 @@ Scrolling
 
 //save mp coords of centre of the screen (adjust_darea_size scrolls to the last saved position)
 void save_scroll_position() {
-	if (mp_png) {
-		scroll_centre_x = pxl_to_mp_x_coord(gtk_adjustment_get_value(hadj) + win_width/2);
-		scroll_centre_y = pxl_to_mp_y_coord(gtk_adjustment_get_value(vadj) + win_height/2);
-	} else {
-		scroll_centre_x = 0;
-		scroll_centre_y = 0;
+	if (!scrollbar_lock) {
+		GtkAllocation alloc;
+		gtk_widget_get_allocation(scrolled_window, &alloc);
+
+		if (alloc.width < sketch_width)
+			scroll_centre_x = pxl_to_mp_x_coord(gtk_adjustment_get_value(hadj) + alloc.width/2);
+		else
+			scroll_centre_x = pxl_to_mp_x_coord(sketch_width/2);
+
+		if (alloc.height < sketch_height)
+			scroll_centre_y = pxl_to_mp_y_coord(gtk_adjustment_get_value(vadj) + alloc.height/2);
+		else
+			scroll_centre_y = pxl_to_mp_y_coord(sketch_height/2);
 	}
 }
 
 //centre given mp coords in window
 void scroll_to(double x,double y) {
-	gtk_adjustment_set_value(hadj,mp_x_coord_to_pxl(x) - win_width/2);
-	gtk_adjustment_set_value(vadj,mp_y_coord_to_pxl(y) - win_height/2);
+	GtkAllocation alloc;
+	gtk_widget_get_allocation(scrolled_window, &alloc);
+	gtk_adjustment_set_value(hadj,mp_x_coord_to_pxl(x) - alloc.width/2);
+	gtk_adjustment_set_value(vadj,mp_y_coord_to_pxl(y) - alloc.height/2);
 }
 static gboolean scroll_to_origin() {
 	if (!mp_png || win_width == 0) return TRUE;
 	scroll_to(0,0);
 	return FALSE;
 }
-//when zooming in, we want the centre of the window to stay fixed
-static gboolean maintain_scroll(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
+//when zooming in/out, or resizing the window, we want the centre of the window to stay fixed
+static gboolean maintain_scroll() {
 	scroll_to(scroll_centre_x, scroll_centre_y);
+	scrollbar_lock = false; //allow save_scroll_position to run now that adjust_darea_size has finished
 	return FALSE;
 }
 
@@ -544,13 +564,11 @@ Zooming
 **********************/
 
 void zoom_in() {
-	save_scroll_position();
 	scale *= 1.5;
 	adjust_darea_size();
 }
 
 void zoom_out() {
-	save_scroll_position();
 	scale /= 1.5;
 	adjust_darea_size();
 }
@@ -956,6 +974,8 @@ void setup_darea(GtkWidget *vbox) {
 	GtkWidget *child = gtk_bin_get_child(GTK_BIN(scrolled_window));
 	hadj = gtk_scrollable_get_hadjustment(GTK_SCROLLABLE(child));
 	vadj = gtk_scrollable_get_vadjustment(GTK_SCROLLABLE(child));
+	g_signal_connect(hadj,"value-changed",G_CALLBACK(save_scroll_position),NULL);
+	g_signal_connect(vadj,"value-changed",G_CALLBACK(save_scroll_position),NULL);
 }
 
 static void activate (GtkApplication* app, gpointer user_data) {
@@ -977,7 +997,7 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	g_signal_connect(window, "button-release-event",	G_CALLBACK(button_release), NULL);
 	g_signal_connect(window, "key-press-event",			G_CALLBACK(key_press),		NULL);
 	g_signal_connect(window, "motion-notify-event",		G_CALLBACK(on_motion),		NULL);
-	g_signal_connect(window, "configure-event",			G_CALLBACK(resize),			NULL);
+	g_signal_connect(window, "check-resize",			G_CALLBACK(resize),			NULL);
 
 	GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	gtk_container_add(GTK_CONTAINER(window), vbox);
@@ -993,8 +1013,6 @@ static void activate (GtkApplication* app, gpointer user_data) {
 	scale = 1;
 	pixels_per_point = scale*density/INCH;
 	if (mp_filename) refresh(window);
-
-	g_timeout_add(100,scroll_to_origin,window);
 }
 
 static void open(GApplication *app,
