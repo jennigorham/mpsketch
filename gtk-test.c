@@ -48,6 +48,7 @@ GtkWidget *end_mi;
 GtkWidget *fig_mi;
 GtkWidget *next_fig_mi;
 GtkWidget *prev_fig_mi;
+GtkWidget *rerun_mi;
 
 
 //Info bar
@@ -67,6 +68,7 @@ void show_help(gpointer window);
 void open_dialog(GtkWidget *window); //open an mp file
 
 //Get png of the metapost
+void rerun_metapost(gpointer window); //show infobar message then do refresh
 static gboolean refresh(gpointer window); //run metapost
 void get_figure(gpointer window); //convert the current figure to png
 void adjust_darea_size(); //make darea fit the new png, or new scale
@@ -320,6 +322,8 @@ void open_dialog(GtkWidget *window) {
 
 		gtk_label_set_text (GTK_LABEL (message_label), "Running metapost...");
 		g_idle_add(refresh,GTK_WINDOW(window));
+
+		gtk_widget_set_sensitive(rerun_mi,true);
 	}
 	gtk_widget_destroy(dialog);
 }
@@ -328,6 +332,14 @@ void open_dialog(GtkWidget *window) {
 /**********************
 Get png of the metapost
 **********************/
+
+void rerun_metapost(gpointer window) {
+	if (mp_filename) {
+		gtk_label_set_text (GTK_LABEL (message_label), "Running metapost...");
+		//if we run refresh in the normal manner, then the infobar message won't show up. we have to use g_idle_add to wait until after the label is updated
+		g_idle_add(refresh,window);
+	}
+}
 
 //rerun metapost, convert to png
 static gboolean refresh(gpointer window) {
@@ -764,12 +776,6 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 				show_trace = !show_trace;
 				redraw_screen();
 				break;
-			case GDK_KEY_r: //refresh metapost
-				if (mp_filename) {
-					gtk_label_set_text (GTK_LABEL (message_label), "Running metapost...");
-					g_idle_add(refresh,GTK_WINDOW(widget));
-				}
-				break;
 			case GDK_KEY_x:
 				if (event->state & GDK_CONTROL_MASK) { //ctrl-x cut
 					output_path();
@@ -854,6 +860,12 @@ static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox)
 	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), open_mi);
 	g_signal_connect_swapped(G_OBJECT(open_mi), "activate", G_CALLBACK (open_dialog), window);
 	gtk_widget_add_accelerator(open_mi, "activate", accel_group, GDK_KEY_o, 0, GTK_ACCEL_VISIBLE);
+
+	rerun_mi = gtk_menu_item_new_with_label("Rerun MetaPost");
+	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), rerun_mi);
+	g_signal_connect_swapped(G_OBJECT(rerun_mi), "activate", G_CALLBACK (rerun_metapost), window);
+	gtk_widget_add_accelerator(rerun_mi, "activate", accel_group, GDK_KEY_r, 0, GTK_ACCEL_VISIBLE);
+	if (!mp_filename) gtk_widget_set_sensitive(rerun_mi,false);
 
 	fig_mi = gtk_menu_item_new_with_label("Change figure...");
 	gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), fig_mi);
