@@ -524,7 +524,7 @@ void save_scroll_position() {
 			scroll_centre_x = pxl_to_mp_x_coord(sketch_width/2);
 
 		if (alloc.height < sketch_height)
-			scroll_centre_y = pxl_to_mp_y_coord(gtk_adjustment_get_value(vadj) + alloc.height/2);
+			scroll_centre_y = pxl_to_mp_y_coord(gtk_adjustment_get_value(vadj) + win_height/2);
 		else
 			scroll_centre_y = pxl_to_mp_y_coord(sketch_height/2);
 	}
@@ -535,7 +535,7 @@ void scroll_to(double x,double y) {
 	GtkAllocation alloc;
 	gtk_widget_get_allocation(scrolled_window, &alloc);
 	gtk_adjustment_set_value(hadj,mp_x_coord_to_pxl(x) - alloc.width/2);
-	gtk_adjustment_set_value(vadj,mp_y_coord_to_pxl(y) - alloc.height/2);
+	gtk_adjustment_set_value(vadj,mp_y_coord_to_pxl(y) - win_height/2);
 }
 static gboolean scroll_to_origin() {
 	if (!mp_png || win_width == 0) return TRUE;
