@@ -18,6 +18,8 @@ menus? open, help, quit, show/hide trace, change units, precision, change figure
 may be possible to display the vector graphics without converting to png first: http://stackoverflow.com/questions/3672847/how-to-embed-evince
 */
 
+int units_dropdown_index; //remember whether units were specified as bp/mm/cm/in/pt
+
 cairo_surface_t *mp_png; //raster image of the metapost output
 cairo_surface_t *trace; //image to trace over
 cairo_t *cr;
@@ -66,6 +68,10 @@ void resume_drawing(gpointer window); //undo end_path()
 void show_error(gpointer window,char *fmt,char *msg);
 void show_help(gpointer window);
 void open_dialog(GtkWidget *window); //open an mp file
+
+void units_preferences(gpointer window); //dialog for changing units
+void units_update(GtkWidget *widget, GtkWidget **widgets); //update the example line in the units dialog when the user changes something
+double units_multiplier(int i); //get multiplier from index on the units dropdown
 
 //Get png of the metapost
 void rerun_metapost(gpointer window); //show infobar message then do refresh
@@ -326,6 +332,160 @@ void open_dialog(GtkWidget *window) {
 		gtk_widget_set_sensitive(rerun_mi,true);
 	}
 	gtk_widget_destroy(dialog);
+}
+
+//dialog for changing units. Looks something like this:
+/*
+         Units: _____ [bp/mm/cm/in/pt] <-- dropdown box
+Decimal points: __________
+     Unit name: __________
+
+E.g. (100,-200) will be printed as:
+(10.0u,-20.0u) <-- this updates based on what units are chosen
+OK    Cancel
+*/
+void units_preferences(gpointer window) {
+	GtkWidget *dialog = gtk_dialog_new_with_buttons(
+		"Units",
+		window,
+		GTK_DIALOG_DESTROY_WITH_PARENT, 
+		"OK", GTK_RESPONSE_OK, 
+		"Cancel", GTK_RESPONSE_NONE,
+		NULL);
+	GtkWidget *content_area = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
+
+	GtkWidget *grid = gtk_grid_new();
+	gtk_container_add(GTK_CONTAINER(content_area), grid);
+
+	//Units row
+	GtkWidget *label = gtk_label_new("Units: ");
+	gtk_widget_set_halign(label,GTK_ALIGN_END);
+	gtk_grid_attach (GTK_GRID (grid), label, 0,0,1,1);
+
+	GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+	gtk_grid_attach (GTK_GRID (grid), hbox, 1,0,1,1);
+	GtkWidget *units_entry = gtk_entry_new();
+	gtk_entry_set_width_chars(GTK_ENTRY(units_entry),4);
+	gtk_box_pack_start(GTK_BOX(hbox), units_entry, FALSE, FALSE, 0);
+
+	char unit_text[5];
+	snprintf(unit_text,5,"%f", unit/units_multiplier(units_dropdown_index));
+	gtk_entry_set_text(GTK_ENTRY(units_entry),unit_text);
+
+	GtkWidget *units_dropdown = gtk_combo_box_text_new();
+	gtk_box_pack_start(GTK_BOX(hbox), units_dropdown, FALSE, FALSE, 0);
+
+	gtk_combo_box_text_append_text( GTK_COMBO_BOX_TEXT( units_dropdown ), "bp" );
+	gtk_combo_box_text_append_text( GTK_COMBO_BOX_TEXT( units_dropdown ), "mm" );
+	gtk_combo_box_text_append_text( GTK_COMBO_BOX_TEXT( units_dropdown ), "cm" );
+	gtk_combo_box_text_append_text( GTK_COMBO_BOX_TEXT( units_dropdown ), "in" );
+	gtk_combo_box_text_append_text( GTK_COMBO_BOX_TEXT( units_dropdown ), "pt" );
+	gtk_combo_box_set_active(GTK_COMBO_BOX(units_dropdown),units_dropdown_index);
+	
+	//Precision row
+	label = gtk_label_new("Decimal points: ");
+	gtk_widget_set_halign(label,GTK_ALIGN_END);
+	gtk_grid_attach (GTK_GRID (grid), label, 0,1,1,1);
+
+	GtkWidget *prec_entry = gtk_entry_new();
+	gtk_entry_set_width_chars(GTK_ENTRY(prec_entry),4);
+	gtk_grid_attach (GTK_GRID (grid), prec_entry, 1,1,1,1);
+
+	char prec_text[5];
+	snprintf(prec_text,5,"%d",coord_precision);
+	gtk_entry_set_text(GTK_ENTRY(prec_entry),prec_text);
+
+	//Name row
+	label = gtk_label_new("Unit name: ");
+	gtk_widget_set_halign(label,GTK_ALIGN_END);
+	gtk_grid_attach (GTK_GRID (grid), label, 0,2,1,1);
+
+	GtkWidget *name_entry = gtk_entry_new();
+	gtk_entry_set_width_chars(GTK_ENTRY(name_entry),4);
+	gtk_entry_set_text(GTK_ENTRY(name_entry),unit_name);
+	gtk_grid_attach (GTK_GRID (grid), name_entry, 1,2,1,1);
+	
+	//Example row
+	label = gtk_label_new("");
+	gtk_grid_attach (GTK_GRID (grid), label, 0,3,2,1);
+
+	//Call units_update when the user changes something
+	GtkWidget *widgets[6] = { units_entry, units_dropdown, prec_entry, name_entry, label, dialog };
+	g_signal_connect(G_OBJECT(units_entry),    "changed", G_CALLBACK (units_update),widgets);
+	g_signal_connect(G_OBJECT(units_dropdown), "changed", G_CALLBACK (units_update),widgets);
+	g_signal_connect(G_OBJECT(prec_entry),     "changed", G_CALLBACK (units_update),widgets);
+	g_signal_connect(G_OBJECT(name_entry),     "changed", G_CALLBACK (units_update),widgets);
+	units_update(prec_entry,widgets);
+
+	gtk_widget_show_all(content_area);
+
+	if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK) {
+		double bp = strtod(gtk_entry_get_text(GTK_ENTRY(units_entry)),NULL);
+		if (bp != 0) { //OK button is deactivated when bp == 0 so this should always be true
+			units_dropdown_index = gtk_combo_box_get_active(GTK_COMBO_BOX(units_dropdown));
+			bp *= units_multiplier(units_dropdown_index);
+			unit = bp;
+			coord_precision = atoi(gtk_entry_get_text(GTK_ENTRY( prec_entry )));
+
+			snprintf(unit_name,100,"%s",gtk_entry_get_text(GTK_ENTRY( name_entry )));
+
+			printf("Changing units to %s%s, %s decimal points, unit name \"%s\"\n",
+				gtk_entry_get_text(GTK_ENTRY(units_entry)),
+				gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(units_dropdown)),
+				gtk_entry_get_text(GTK_ENTRY(prec_entry)),
+				unit_name);
+		}
+	}
+	gtk_widget_destroy(dialog);
+}
+
+//get multiplier from index on the units dropdown
+double units_multiplier(int i) {
+	double multiplier;
+	switch (i) {
+		case 1: //mm
+			multiplier = INCH/25.4;
+			break;
+		case 2: //cm
+			multiplier = INCH/2.54;
+			break;
+		case 3: //in
+			multiplier = INCH;
+			break;
+		case 4: //pt
+			multiplier = INCH/72.27; //conversion between printer's points and postscript points
+			break;
+		default:
+			multiplier = 1;
+	}
+	return multiplier;
+}
+
+//update the example line in the units dialog when the user changes something
+void units_update(GtkWidget *widget, GtkWidget **widgets) {
+	double bp = strtod(gtk_entry_get_text(GTK_ENTRY(widgets[0])),NULL);
+	if (bp == 0) { //user hasn't typed a valid number yet
+		gtk_dialog_set_response_sensitive(GTK_DIALOG(widgets[5]), GTK_RESPONSE_OK, FALSE); //disable OK button
+		gtk_label_set_text (GTK_LABEL (widgets[4]), "\nE.g. (100,-200) will be printed as:\n...");
+	} else {
+		gtk_dialog_set_response_sensitive(GTK_DIALOG(widgets[5]), GTK_RESPONSE_OK, TRUE); //enable OK button
+		bp *= units_multiplier(gtk_combo_box_get_active(GTK_COMBO_BOX(widgets[1])));
+
+		int precision;
+		//set precision appropriately if unit has changed
+		if (widget == widgets[0] || widget == widgets[1]) {
+			char prec_text[5];
+			precision = ceil(log10(bp));
+			snprintf(prec_text,5,"%d", precision);
+			gtk_entry_set_text(GTK_ENTRY(widgets[2]),prec_text);
+		} else
+			precision = atoi(gtk_entry_get_text(GTK_ENTRY(widgets[2])));
+
+		const gchar *name = gtk_entry_get_text(GTK_ENTRY(widgets[3]));
+		char s[100];
+		snprintf(s,100,"\nE.g. (100,-200) will be printed as:\n(%.*f%s,%.*f%s)",precision,100 / bp,name,precision,-200 / bp,name); 
+		gtk_label_set_text (GTK_LABEL (widgets[4]), s);
+	}
 }
 
 
@@ -910,6 +1070,14 @@ static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox)
 	g_signal_connect_swapped(G_OBJECT(paste_mi), "activate", G_CALLBACK (paste_path), window);
 	gtk_widget_add_accelerator(paste_mi, "activate", accel_group, GDK_KEY_v, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
 
+	GtkWidget *sep = gtk_separator_menu_item_new();
+	gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu), sep);
+
+	GtkWidget *units_mi = gtk_menu_item_new_with_label("Units...");
+	gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu), units_mi);
+	g_signal_connect_swapped(G_OBJECT(units_mi), "activate", G_CALLBACK (units_preferences), window);
+	gtk_widget_add_accelerator(units_mi, "activate", accel_group, GDK_KEY_u, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+
 	//View menu
 	GtkWidget *view_menu = gtk_menu_new();
 	GtkWidget *view_mi = gtk_menu_item_new_with_label("View");
@@ -942,7 +1110,7 @@ static void setup_menus(GtkApplication* app, GtkWidget *window, GtkWidget *vbox)
 	gtk_widget_add_accelerator(resume_mi, "activate", accel_group, GDK_KEY_k, 0, GTK_ACCEL_VISIBLE);
 	gtk_widget_set_sensitive(resume_mi,false);
 
-	GtkWidget *sep = gtk_separator_menu_item_new();
+	sep = gtk_separator_menu_item_new();
 	gtk_menu_shell_append(GTK_MENU_SHELL(sketch_menu), sep);
 
 	//Drawing modes: curve/straight/circle
@@ -1053,7 +1221,22 @@ static gboolean get_unit(gchar *option_name,gchar *value,gpointer data,GError **
 		puts("e.g. mpsketch -u 2cm");
 		return FALSE;
 	}
-	coord_precision = ceil(log10(unit)); //choose a sensible number of decimal places for coordinates
+
+	//remember what units it was written in, for units preferences dialog
+	char *unit_part; strtod(value,&unit_part);
+	if (*unit_part != 0) {
+		if (strcmp(unit_part,"mm") == 0)
+			units_dropdown_index = 1;
+		else if (strcmp(unit_part,"cm") == 0)
+			units_dropdown_index = 2;
+		else if (strcmp(unit_part,"in") == 0)
+			units_dropdown_index = 3;
+		else if (strcmp(unit_part,"pt") == 0)
+			units_dropdown_index = 4;
+	}
+	
+	//choose a sensible number of decimal places for coordinates
+	coord_precision = ceil(log10(unit)); 
 	//printf("unit=%f\n",unit);
 	//printf("precision=%d\n",coord_precision);
 	return TRUE;
@@ -1075,7 +1258,9 @@ int main (int argc, char **argv) {
 	//defaults which will be overridden if specified on command line
 	unit = 1; //1 postscript point (1/72 inches). 
 	coord_precision = 0;
-	unit_name = "";
+	unit_name = malloc(100 * sizeof *unit_name);
+	*unit_name = '\0';
+	units_dropdown_index = 0;
 	fig_num = 1;
 	show_trace = false;
 
@@ -1103,6 +1288,7 @@ int main (int argc, char **argv) {
 	cairo_surface_destroy(trace);
 
 	cleanup();
+	free(unit_name);
 
 	return status;
 }
