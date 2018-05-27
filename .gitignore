@@ -4,6 +4,9 @@ test.[1-9]
 test.log
 test.mpx
 mplib
+source
 *.png
 *.xbm
+*.swp
+tags
 mpsketch-tmp-*

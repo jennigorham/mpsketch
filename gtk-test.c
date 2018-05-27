@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include <libgen.h> //dirname
+#include <time.h>
 
 #define MP_BORDER 200 //extra space around the mp png
 
@@ -51,6 +52,9 @@ GtkWidget *fig_mi;
 GtkWidget *next_fig_mi;
 GtkWidget *prev_fig_mi;
 GtkWidget *rerun_mi;
+
+//hack to stop it double clicking
+time_t last_click = 0;
 
 
 //Info bar
@@ -349,8 +353,8 @@ void units_preferences(gpointer window) {
 		"Units",
 		window,
 		GTK_DIALOG_DESTROY_WITH_PARENT, 
-		"OK", GTK_RESPONSE_OK, 
 		"Cancel", GTK_RESPONSE_NONE,
+		"OK", GTK_RESPONSE_OK, 
 		NULL);
 	GtkWidget *content_area = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
 
@@ -870,7 +874,10 @@ static gboolean button_release(GtkWidget *widget, GdkEventButton *event, gpointe
 	if (event->button == 1) {
 		int x,y;
 		darea_coords(event->x,event->y,&x,&y);
-		click_point(x,y);
+		//For some reason gtk has started sending two button release events every time (as of May 2018, vs back in 2017 when I originally wrote this). I don't know how to fix this so we'll just reject any click that comes too soon after the last one
+		if (clock() - last_click < 100)
+			click_point(x,y);
+		last_click = clock();
 	}
 	return FALSE;
 }
@@ -958,6 +965,14 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_d
 static gboolean on_motion(GtkWidget *widget, GdkEventMotion *event, gpointer user_data) {
 	int x, y;
 	darea_coords(event->x,event->y,&x,&y);
+
+	//For some reason we now (2018 vs 2017) don't need to compensate for the menubar while the mouse is up, so we need to undo the compensation that darea_coords did. Don't ask me why this has changed or why it doesn't affect motion while the mouse is down
+	if (!(event->state & GDK_BUTTON1_MASK)) {
+		GtkAllocation alloc;
+		gtk_widget_get_allocation(scrolled_window, &alloc);
+		y+=alloc.y;
+	}
+
 	pointer_move(x,y);
 	return FALSE;
 }
