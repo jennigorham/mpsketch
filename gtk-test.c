@@ -237,8 +237,8 @@ void resume_drawing(gpointer window) {
 		//get the coords of the pointer
 		gint wx, wy;
 		GdkDisplay *display = gdk_display_get_default ();
-		GdkDeviceManager *device_manager = gdk_display_get_device_manager (display);
-		GdkDevice *device = gdk_device_manager_get_client_pointer (device_manager);
+		GdkSeat *seat = gdk_display_get_default_seat (display);
+		GdkDevice *device = gdk_seat_get_pointer (seat);
 		gdk_window_get_device_position(gtk_widget_get_window(window),device,&wx,&wy,NULL);
 		int x,y;
 		darea_coords(wx,wy,&x,&y);
