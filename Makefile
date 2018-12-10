@@ -13,7 +13,7 @@ clean:
 mplib/mplib.h:
 	#This requires downloading roughly 700MB of stuff, which then grows to 2GB once you build it, so make sure you have disk space
 	#Building mplib requires a few libraries. On my system I had to:
-	#sudo apt-get install libpoppler-dev libxmu-dev libxaw7-dev
+	#sudo apt-get install libpoppler-dev libxmu-dev libxaw7-dev flex bison
 	#If the "Build" script fails, it will tell you what libraries it's missing. Install them and try running it again.
 	mkdir -p mplib
 	svn checkout svn://tug.org/texlive/branches/branch2018/Build/source #~700MB
@@ -24,7 +24,7 @@ mplib/mplib.h:
 	cp source/Work/libs/zlib/libz.a mplib; \
 	cp source/Work/texk/web2c/libmp*.a mplib; \
 	cp source/Work/texk/kpathsea/.libs/libkpathsea.a mplib; \
-	cp source//Work/texk/web2c/mplib.h mplib)
+	cp source/Work/texk/web2c/mplib.h mplib)
 	##It used to be at foundry.supelec.fr but this seems to be down now
 	#svn checkout --username anonsvn --password anonsvn https://foundry.supelec.fr/svn/metapost/trunk
 	#cd trunk; ./build.sh &&
