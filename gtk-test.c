@@ -373,7 +373,7 @@ void units_preferences(gpointer window) {
 	gtk_box_pack_start(GTK_BOX(hbox), units_entry, FALSE, FALSE, 0);
 
 	char unit_text[5];
-	snprintf(unit_text,5,"%f", unit/units_multiplier(units_dropdown_index));
+	snprintf(unit_text,5,"%.2f", unit/units_multiplier(units_dropdown_index));
 	gtk_entry_set_text(GTK_ENTRY(units_entry),unit_text);
 
 	GtkWidget *units_dropdown = gtk_combo_box_text_new();
