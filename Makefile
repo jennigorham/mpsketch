@@ -1,5 +1,7 @@
-LDFLAGS = -L mplib
-LDLIBS = -lmplibcore -lmplibbackends -lkpathsea -lmputil -lcairo -lpixman-1 -lpng -lz -lmpfr -lgmp -lm
+LDFLAGS = 
+#LDFLAGS = -L mplib
+LDLIBS = -lm
+#LDLIBS = -lmplibcore -lmplibbackends -lkpathsea -lmputil -lcairo -lpixman-1 -lpng -lz -lmpfr -lgmp -lm
 
 mpsketch: mpsketch.c paths.c paths.h mptoraster.c mptoraster.h common.c common.h
 	gcc -g -Wall mpsketch.c paths.c common.c mptoraster.c -L/usr/X11R6/lib -lX11 $(LDFLAGS) $(LDLIBS) -o mpsketch

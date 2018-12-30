@@ -4,6 +4,7 @@ void init_path(struct path *p) {
 	p->cycle = false;
 	p->size = 10;
 	p->points = malloc(p->size * sizeof *p->points);
+	p->aug_mat = malloc(p->size * (p->size + 1) * sizeof(double));
 	p->n = 0;
 }
 
@@ -118,6 +119,287 @@ char *string_to_path(char *s) {
 	return end;
 }
 
+/**************************************************************************************
+I've implemented the algorithm on p131 of metafontbook (http://www.ctex.org/documents/shredder/src/mfbook.pdf)
+so that there's no need to compile mplib to get this working.
+For each curved section of the path, it finds the distances between the points (l) and the turning angles (psi),
+as described in metafontbook (although I number them from 0 instead of 1), then taking equation (**) and setting
+alpha=beta=1 (the default tension), and replacing phi with -psi-theta, the equation for the interior points becomes 
+l_{k+1} theta_k + (2 l_{k+1} + 2 l_{k}) theta_{k+1} + l_{k} theta_{k+2} = -l_{k} psi_{k+1} - 2 l_{k+1} psi_{k}
+The coefficients are guaranteed to be non-zero as long as l>0 (which it is because coincident points are not 
+included in a curved section.)
+
+If it's not cyclic then we also have to consider the end points.
+Equation (***) with gamma=1 (the default curl) becomes
+theta_0 + theta_1 = -psi_0
+And equation (***') with psi for the final point arbitrarily set to zero (because it allows us to work in terms of
+theta instead of phi at the final point), and with points labeled from 0 to n-1 instead of 0 to n, becomes
+theta_{n-2} + theta_{n-1} = 0
+
+Making an augmented matrix from these equations gives something that looks like:
+*	*	*	0	0	|	*
+0	*	*	*	0	|	*
+0	0	*	*	*	|	*
+*	0	0	*	*	|	*
+*	*	0	0	*	|	*
+for a cyclic path of 5 points, for example, or like:
+*	*	*	0	0	|	*
+0	*	*	*	0	|	*
+0	0	*	*	*	|	*
+0	0	0	1	1	|	0
+1	1	0	0	0	|	*
+for a non-cyclic path (the asterisks stand for real numbers). These matrices are almost in upper triangular form,
+so all that's needed is to get rid of the numbers in the bottom left using row operations, then put into reduced
+row echelon form to find theta at each point.
+(The matrix has n rows and (n+1) columns and is addressed as aug_mat[row_num*(n+1) + column_num].)
+
+Then we can use the equations at the bottom of p131 to solve for u and v, the control points.
+**************************************************************************************/
+void get_row_k(double *l, double *psi, int n, int k) {
+	//equations are of the form l_{k+1} theta_k + (2 l_{k+1} + 2 l_{k}) theta_{k+1} + l_{k} theta_{k+2} = -l_{k} psi_{k+1} - 2 l_{k+1} psi_{k}
+	cur_path->aug_mat[k*(n+1) + k] = l[(k+1)%n]; //row k column k of matrix: coefficient of theta_k
+	cur_path->aug_mat[k*(n+1) + (k+1)%n] = 2*l[(k+1)%n] + 2*l[k]; //row k column k+1 of matrix: coefficient of theta_{k+1}
+	cur_path->aug_mat[k*(n+1) + (k+2)%n] = l[k]; //row k column k+2 of matrix: coefficient of theta_{k+2}
+	for (int j=3; j<n; j++)
+		cur_path->aug_mat[k*(n+1) + (k+j)%n] = 0; //all other columns in this row should be 0
+	cur_path->aug_mat[k*(n+1) + n] = -l[k]*psi[(k+1)%n] - 2*l[(k+1)%n]*psi[k]; //row k, last column of matrix: rhs of equation
+}
+void print_aug_matrix(int n) { //for troubleshooting
+	printf("\n");
+	for (int k=0; k<n; k++) {
+		for (int j=0; j<n; j++) {
+			printf("%f\t",cur_path->aug_mat[k*(n+1) + j]);
+		}
+		printf("| %f\n",cur_path->aug_mat[k*(n+1) + n]);
+	}
+	printf("\n");
+}
+double *get_aug_matrix(int i, int n, bool is_cycle) {
+	double *l = malloc(n * sizeof(double)); //distances between adjacent points
+	double *psi = malloc(n * sizeof(double)); //turning angles at interior points
+	int k;
+	for (k=0; k<n; k++) {
+		double x1,y1,x2,y2,x3,y3;
+		if (k<n-1 || is_cycle) {
+			x1 = cur_path->points[(i+k)%cur_path->n].x;
+			y1 = cur_path->points[(i+k)%cur_path->n].y;
+			x2 = cur_path->points[(i+k+1)%cur_path->n].x;
+			y2 = cur_path->points[(i+k+1)%cur_path->n].y;
+			l[k] = sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
+		}
+
+		if (k<n-2 || is_cycle) {
+			x3 = cur_path->points[(i+k+2)%cur_path->n].x;
+			y3 = cur_path->points[(i+k+2)%cur_path->n].y;
+			psi[k] = atan2((x2-x1)*(y3-y2) - (x3-x2)*(y2-y1), (x2-x1)*(x3-x2) + (y2-y1)*(y3-y2));
+		}
+	}
+	if (!is_cycle) //arbitrarily set psi=0 at last point
+		psi[n-2] = 0;
+
+	/*printf("l: ");
+	for (k=0; k<n-1; k++) printf("%f ",l[k]);
+	printf("\n");
+
+	printf("psi: ");
+	for (k=0; k<n-2; k++) printf("%f ",psi[k]);
+	printf("\n");*/
+
+	for (k=0; k<n && (k<n-2 || is_cycle); k++) {
+		get_row_k(l,psi,n,k);
+	}
+	if (!is_cycle) {
+		//theta_{n-2} + theta_{n-1} = 0
+		cur_path->aug_mat[(n-2)*(n+1) + n-2] = 1; //row n-2, column n-2: coefficient of theta_{n-2}
+		cur_path->aug_mat[(n-2)*(n+1) + n-1] = 1; //row n-2, column n-1: coefficient of theta_{n-1}
+		cur_path->aug_mat[(n-2)*(n+1) + n] = 0; //row n-2, last column: rhs
+		for (k=0; k<n-2; k++)
+			cur_path->aug_mat[(n-2)*(n+1) + k] = 0; //all other coefficients are 0
+
+		//theta_0 + theta_1 = -psi_0
+		cur_path->aug_mat[(n-1)*(n+1) + 0] = 1; //row n-1, column 0: coefficient of theta_0
+		cur_path->aug_mat[(n-1)*(n+1) + 1] = 1; //row n-1, column 1: coefficient of theta_1
+		cur_path->aug_mat[(n-1)*(n+1) + n] = -psi[0]; //row n-1, last column: rhs
+		for (k=2; k<n; k++)
+			cur_path->aug_mat[(n-1)*(n+1) + k] = 0; //all other coefficients are 0
+	}
+
+	//print_aug_matrix(n);
+
+	free(l); //don't need this any more
+	return(psi); //still need this to find phi once theta is solved for.
+}
+
+void rref(int n) { //get the augmented matrix into row reduced echelon form
+	//make leading coefficients 1
+	double *mat = cur_path->aug_mat;
+	for (int k=0; k<n-2; k++) {
+		double a = mat[k*(n+1) + k];
+		mat[k*(n+1) + k] = 1;
+		mat[k*(n+1) + k+1] /= a;
+		mat[k*(n+1) + k+2] /= a;
+		mat[k*(n+1) + n] /= a;
+	}
+	//print_aug_matrix(n);
+
+	/* Matrix now looks like:
+	1	*	*	0	0	|	*
+	0	1	*	*	0	|	*
+	0	0	1	*	*	|	*
+	*	0	0	*	*	|	*
+	*	*	0	0	*	|	*
+	*/
+
+	if (mat[(n-2)*(n+1) + 0] != 0) { //this only happens if we've got a cycle without any straight sections or coincident points
+		//use kth row to get rid of leading term in penultimate row
+		for (int k=0; k<n-2; k++) {
+			double a = mat[(n-2)*(n+1) + k]; //penultimate row, kth column
+			if (a != 0) {
+				mat[(n-2)*(n+1) + k] = 0;
+				mat[(n-2)*(n+1) + k+1] -= a*mat[k*(n+1) + k+1];
+				mat[(n-2)*(n+1) + k+2] -= a*mat[k*(n+1) + k+2];
+				mat[(n-2)*(n+1) + n]   -= a*mat[k*(n+1) + n];
+			}
+		}
+		//make leading coefficient 1
+		double a = mat[(n-2)*(n+1) + n-2];
+		mat[(n-2)*(n+1) + n-2] = 1;
+		mat[(n-2)*(n+1) + n-1] /= a;
+		mat[(n-2)*(n+1) + n] /= a;
+	}
+	//print_aug_matrix(n);
+
+	/* Matrix now looks like:
+	1	*	*	0	0	|	*
+	0	1	*	*	0	|	*
+	0	0	1	*	*	|	*
+	0	0	0	1	*	|	*
+	*	*	0	0	*	|	*
+	*/
+
+	//use kth row to get rid of leading term in last row
+	for (int k=0; k<n-1; k++) {
+		double a = mat[(n-1)*(n+1) + k]; //last row, kth column
+		if (a != 0) {
+			mat[(n-1)*(n+1) + k] = 0;
+			mat[(n-1)*(n+1) + k+1] -= a*mat[k*(n+1) + k+1];
+			if (k+2 < n)
+				mat[(n-1)*(n+1) + k+2] -= a*mat[k*(n+1) + k+2];
+			mat[(n-1)*(n+1) + n]   -= a*mat[k*(n+1) + n];
+			//print_aug_matrix(n);
+		}
+	}
+	//make leading coefficient 1
+	mat[(n-1)*(n+1) + n] /= mat[(n-1)*(n+1) + n-1];
+	mat[(n-1)*(n+1) + n-1] = 1;
+
+	/* Matrix now looks like:
+	1	*	*	0	0	|	*
+	0	1	*	*	0	|	*
+	0	0	1	*	*	|	*
+	0	0	0	1	*	|	*
+	0	0	0	0	1	|	*
+	*/
+
+	for (int k=n-1; k>0; k--) {
+		//use row k to make a zero in row k-1 above
+		mat[(k-1)*(n+1) + n] -= mat[(k-1)*(n+1) + k]*mat[k*(n+1) + n];
+		mat[(k-1)*(n+1) + k] = 0;
+		//do the same with row k-2
+		if (k>1) {
+			mat[(k-2)*(n+1) + n] -= mat[(k-2)*(n+1) + k]*mat[k*(n+1) + n];
+			mat[(k-2)*(n+1) + k] = 0;
+		}
+	}
+
+	/* Matrix now in rref form:
+	1	0	0	0	0	|	*
+	0	1	0	0	0	|	*
+	0	0	1	0	0	|	*
+	0	0	0	1	0	|	*
+	0	0	0	0	1	|	*
+	*/
+
+	//print_aug_matrix(n);
+}
+
+double john_hobby_f(double theta, double phi) { //ultimate formula on p131 of metafontbook
+	return (2 + sqrt(2)*(sin(theta) - sin(phi)/16)*(sin(phi) - sin(theta)/16)*(cos(theta) - cos(phi)))/
+		(3*(1 + (sqrt(5)-1)/2*cos(theta) + (3 - sqrt(5))/2*cos(phi)));
+}
+
+void get_u_v(int i, int k, int n, double *psi) {//penultimate formula. Find the control points
+	//k is which point the curved section starts at, i is which segment in the curved section, n is number of points in curved section
+	//e.g. in the path (0,0)--(1,1)--(2,2)..(3,3)..(4,4)..(5,5)--(6,6) k=2 and n=4; i=0 would refer to the section between (2,2) and (3,3)
+	double x0,y0,x1,y1,theta,phi;
+	theta = cur_path->aug_mat[i*(n+1) + n];
+	phi = -psi[i]-cur_path->aug_mat[((i+1)%n)*(n+1) + n];
+	x0 = cur_path->points[(i+k)%cur_path->n].x;
+	y0 = cur_path->points[(i+k)%cur_path->n].y;
+	x1 = cur_path->points[(i+k+1)%cur_path->n].x;
+	y1 = cur_path->points[(i+k+1)%cur_path->n].y;
+	cur_path->points[(i+k)%cur_path->n].right_x = (x0 + (cos(theta)*(x1-x0) - sin(theta)*(y1-y0))*john_hobby_f(theta,phi));
+	cur_path->points[(i+k)%cur_path->n].right_y = (y0 + (cos(theta)*(y1-y0) + sin(theta)*(x1-x0))*john_hobby_f(theta,phi));
+	cur_path->points[(i+k+1)%cur_path->n].left_x = (x1 - (cos(-phi)*(x1-x0) - sin(-phi)*(y1-y0))*john_hobby_f(phi,theta));
+	cur_path->points[(i+k+1)%cur_path->n].left_y = (y1 - (cos(-phi)*(y1-y0) + sin(-phi)*(x1-x0))*john_hobby_f(phi,theta));
+}
+void set_curved_pair_control_points(int i) { //a curved section with only 2 points is really just a straight section. Set the control points accordingly.
+	int n = cur_path->n;
+	cur_path->points[i%n].right_x = cur_path->points[i%n].x;
+	cur_path->points[i%n].right_y = cur_path->points[i%n].y;
+	cur_path->points[(i+1)%n].left_x = cur_path->points[(i+1)%n].x;
+	cur_path->points[(i+1)%n].left_y = cur_path->points[(i+1)%n].y;
+}
+//find the bezier control points for all the points on the path
+void find_control_points() {
+	int n = cur_path->n;
+	if (n >= 3) {
+		int k=0;
+		while (k<n) {
+			if (cur_path->points[k].straight) {
+				k++;
+			} else {
+				//find the end of the curved section
+				int j;
+				bool is_cycle = cur_path->cycle;
+				for (j=0; j<n-k || (cur_path->cycle && j<n); j++) {
+					bool coincident_points = false;
+					if (cur_path->points[(k+j)%n].x == cur_path->points[(k+j+1)%n].x &&
+						cur_path->points[(k+j)%n].y == cur_path->points[(k+j+1)%n].y)
+					{
+						coincident_points = true;
+						set_curved_pair_control_points(k+j);
+					}
+					if (cur_path->points[(k+j)%n].straight || coincident_points) {
+						is_cycle = false; //the whole path may be a cycle, but this curved section is not
+						j++;
+						break;
+					}
+				}
+				//printf("%d %d\n",k,j);
+
+				if (j>2) {
+					double *psi;
+					is_cycle = is_cycle && j == n;
+					psi = get_aug_matrix(k,j,is_cycle);
+					rref(j);
+					for (int i=0; i<j; i++) {
+						if (i<j-1 || is_cycle)
+							get_u_v(i,k,j,psi);
+					}
+					free(psi);
+				} else if (j==2) {
+					set_curved_pair_control_points(k);
+				}
+				k += j;
+			}
+		}
+	} else {
+		set_curved_pair_control_points(0);
+	}
+}
+
+/*
 //find the bezier control points for all the points on the path
 void find_control_points() {
 	MP mp;
@@ -163,7 +445,7 @@ void find_control_points() {
 	
 	mp_finish ( mp ) ;
 	free(opt);
-}
+}*/
 
 //commands for setting properties of a point
 void set_straight(int i,bool is_straight) {
@@ -194,12 +476,16 @@ int append_point(double x, double y, bool is_straight) {
 	if (cur_path->n == cur_path->size) {
 		cur_path->size *= 2;
 		struct point *tmp;
+		double *tmp_mat;
 		tmp = realloc(cur_path->points,cur_path->size * sizeof *cur_path->points);
-		if (tmp == NULL) {
+		tmp_mat = realloc(cur_path->aug_mat,cur_path->size * (cur_path->size + 1) * sizeof(double));
+		if (tmp == NULL || tmp_mat == NULL) {
+			free(tmp); free(tmp_mat); //in case one succeeds
 			cur_path->size /= 2;
 			return 1;
 		}
 		cur_path->points = tmp;
+		cur_path->aug_mat = tmp_mat;
 	}
 	cur_path->n++;
 	set_last_point(x,y,is_straight);

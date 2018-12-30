@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "mplib/mplib.h" //needed to get control points for bezier curve
+//#include "mplib/mplib.h" //needed to get control points for bezier curve. NOT ANY MORE
 
 #define INITIAL_POINTS 10 //how many points to allocate space for initially
 #define INCH 72.0 //an inch is 72 postscript points
@@ -23,6 +23,7 @@ struct point {
 struct path {
 	struct point *points;
 	int n; //number of points
+	double *aug_mat; //matrix representing the linear equations of theta's
 	size_t size; //number of points we've allocated space for
 	bool cycle; //last point connects to first point
 };
@@ -45,7 +46,15 @@ char *string_to_path(char *buffer);
 
 char *path_to_string(); //return the string defining the path
 
-void find_control_points(); //find metapost's bezier control points for the path
+//Use the algorithm on p131 of metafontbook to find the control points for each curved section of the path
+void get_row_k(double *l, double *psi, int n, int k); //get row k of the augmented matrix
+void print_aug_matrix(int n); //for troubleshooting
+double *get_aug_matrix(int i, int n, bool is_cycle); //turn the n points (starting at point i) connected by '..' into an augmented matrix representing the linear equations of theta's. return array of turning angles
+void rref(int n); //put the augmented matrix into reduced row echelon form
+double john_hobby_f(double theta, double phi); //John Hobby's formula. Used to find the control points
+void get_u_v(int i, int k, int n, double *psi); //find the control points for a curved segment
+void set_curved_pair_control_points(int i); //a curved section with only 2 points is really just a straight section. Set the control points accordingly.
+void find_control_points(); //split the path into curved sections and solve for the bezier control points in each section
 
 //edit a point
 void set_straight(int i,bool is_straight);
