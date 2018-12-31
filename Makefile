@@ -1,4 +1,4 @@
-LDFLAGS = 
+LDFLAGS =
 #LDFLAGS = -L mplib
 LDLIBS = -lm
 #LDLIBS = -lmplibcore -lmplibbackends -lkpathsea -lmputil -lcairo -lpixman-1 -lpng -lz -lmpfr -lgmp -lm

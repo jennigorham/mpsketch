@@ -124,9 +124,9 @@ I've implemented the algorithm on p131 of metafontbook (http://www.ctex.org/docu
 so that there's no need to compile mplib to get this working.
 For each curved section of the path, it finds the distances between the points (l) and the turning angles (psi),
 as described in metafontbook (although I number them from 0 instead of 1), then taking equation (**) and setting
-alpha=beta=1 (the default tension), and replacing phi with -psi-theta, the equation for the interior points becomes 
+alpha=beta=1 (the default tension), and replacing phi with -psi-theta, the equation for the interior points becomes
 l_{k+1} theta_k + (2 l_{k+1} + 2 l_{k}) theta_{k+1} + l_{k} theta_{k+2} = -l_{k} psi_{k+1} - 2 l_{k+1} psi_{k}
-The coefficients are guaranteed to be non-zero as long as l>0 (which it is because coincident points are not 
+The coefficients are guaranteed to be non-zero as long as l>0 (which it is because coincident points are not
 included in a curved section.)
 
 If it's not cyclic then we also have to consider the end points.
@@ -353,49 +353,50 @@ void set_curved_pair_control_points(int i) { //a curved section with only 2 poin
 //find the bezier control points for all the points on the path
 void find_control_points() {
 	int n = cur_path->n;
-	if (n >= 3) {
-		int k=0;
-		while (k<n) {
-			if (cur_path->points[k].straight) {
-				k++;
-			} else {
-				//find the end of the curved section
-				int j;
-				bool is_cycle = cur_path->cycle;
-				for (j=0; j<n-k || (cur_path->cycle && j<n); j++) {
-					bool coincident_points = false;
-					if (cur_path->points[(k+j)%n].x == cur_path->points[(k+j+1)%n].x &&
-						cur_path->points[(k+j)%n].y == cur_path->points[(k+j+1)%n].y)
-					{
-						coincident_points = true;
-						set_curved_pair_control_points(k+j);
-					}
-					if (cur_path->points[(k+j)%n].straight || coincident_points) {
-						is_cycle = false; //the whole path may be a cycle, but this curved section is not
-						j++;
-						break;
-					}
+	int k=0;
+	while (k<n) {
+		if (cur_path->points[k].straight) {
+			k++;
+		} else {
+			//find the end of the curved section
+			int j; //number of points in the section
+			bool is_cycle = cur_path->cycle;
+			for (j=0; j<n-k || (cur_path->cycle && j<n); j++) {
+				bool coincident_points = false;
+				if (cur_path->points[(k+j)%n].x == cur_path->points[(k+j+1)%n].x &&
+					cur_path->points[(k+j)%n].y == cur_path->points[(k+j+1)%n].y)
+				{
+					coincident_points = true;
+					set_curved_pair_control_points(k+j);
 				}
-				//printf("%d %d\n",k,j);
-
-				if (j>2) {
-					double *psi;
-					is_cycle = is_cycle && j == n;
-					psi = get_aug_matrix(k,j,is_cycle);
-					rref(j);
-					for (int i=0; i<j; i++) {
-						if (i<j-1 || is_cycle)
-							get_u_v(i,k,j,psi);
-					}
-					free(psi);
-				} else if (j==2) {
-					set_curved_pair_control_points(k);
+				if (cur_path->points[(k+j)%n].straight || coincident_points) {
+					is_cycle = false; //the whole path may be a cycle, but this curved section is not
+					j++;
+					break;
 				}
-				k += j;
 			}
+			//printf("%d %d\n",k,j);
+
+			if (j>2) {
+				double *psi;
+				psi = get_aug_matrix(k,j,is_cycle);
+				rref(j);
+				for (int i=0; i<j; i++) {
+					if (i<j-1 || is_cycle)
+						get_u_v(i,k,j,psi);
+				}
+				free(psi);
+			} else if (is_cycle) { //a cyclic curved path with just 2 points
+				double psi[2] = {M_PI,M_PI}; //turning angles are all 180 degrees
+				cur_path->aug_mat[0*(n+1) + n] = M_PI/2; //theta = 90 degrees
+				cur_path->aug_mat[1*(n+1) + n] = M_PI/2;
+				get_u_v(0,0,2,psi);
+				get_u_v(1,0,2,psi);
+			} else { //curved section with just 2 points
+				set_curved_pair_control_points(k);
+			}
+			k += j;
 		}
-	} else {
-		set_curved_pair_control_points(0);
 	}
 }
 
